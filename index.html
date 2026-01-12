@@ -1,0 +1,1317 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Trading Journal — Local</title>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    /* Dark trading dashboard styles */
+    :root{
+      --bg:#0b0f14; --card:#0f1620; --muted:#9aa6b2; --accent:#00c853; --danger:#ff5252; --glass:rgba(255,255,255,0.03);
+      --font-sans: 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    html,body{height:100%;}
+    body{
+      margin:0; font-family:var(--font-sans); background:linear-gradient(180deg,#05070a 0%, #0b0f14 100%); color:#e6eef6;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; padding:20px;
+    }
+    .app{
+      max-width:1200px; margin:0 auto; display:flex; flex-direction:column; gap:16px;
+    }
+    .topbar{display:flex; gap:12px; align-items:center;}
+    .brand{font-weight:700; font-size:18px; letter-spacing:0.6px}
+    .controls{margin-left:auto; display:flex; gap:8px; align-items:center}
+    input[type=file]{display:none}
+    .btn{
+      background:var(--glass); border:1px solid rgba(255,255,255,0.03); color:var(--muted); padding:8px 12px; border-radius:8px; cursor:pointer; transition:all .12s;
+    }
+    .btn:hover{transform:translateY(-2px)}
+    .primary{color:#001; background:linear-gradient(90deg,#00e676,#00c853); border:none; box-shadow:0 6px 20px rgba(0,200,83,0.06)}
+    .grid{display:grid; grid-template-columns: 1fr 360px; gap:14px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding:14px; border-radius:12px; border:1px solid rgba(255,255,255,0.03)}
+    .header-row{display:flex; align-items:center; gap:12px}
+    .stats{display:flex; gap:10px; margin-top:12px; flex-wrap:wrap}
+    .stat{background:transparent; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.02); min-width:110px}
+    .stat .v{font-size:18px; font-weight:700}
+    .small{color:var(--muted); font-size:12px}
+    .chart-wrap{height:360px}
+    .table{width:100%; border-collapse:collapse; margin-top:8px}
+    .table th,.table td{padding:8px 6px; text-align:left; font-size:13px}
+    .table thead th{color:var(--muted); font-size:12px}
+    .p-green{color:var(--accent); font-weight:700}
+    .p-red{color:var(--danger); font-weight:700}
+    /* Calendar styles */
+    .calendar{display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:8px}
+    .cal-day{padding:8px; border-radius:6px; background:rgba(255,255,255,0.02); text-align:center; font-size:13px; cursor:pointer}
+    .cal-day.positive{background:linear-gradient(180deg, rgba(0,200,83,0.12), rgba(0,200,83,0.06)); color:var(--accent)}
+    .cal-day.negative{background:linear-gradient(180deg, rgba(255,82,82,0.08), rgba(255,82,82,0.04)); color:var(--danger)}
+    .cal-day.header{background:transparent; color:var(--muted); cursor:default}
+    .cal-day.weekend{background:rgba(128,128,128,0.2); color:var(--muted)}
+    /* Full year month box */
+    .month-box{background:rgba(255,255,255,0.02); padding:8px; border-radius:8px}
+    .month-title{font-weight:700; font-size:13px; margin-bottom:6px}
+    .month-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px}
+    select{background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.03); padding:8px 10px; border-radius:8px}
+    .view-toggle{display:flex; gap:6px}
+    .footer-helpers{display:flex; gap:8px; justify-content:flex-end}
+    @media(max-width:980px){.grid{grid-template-columns:1fr;}.controls{flex-wrap:wrap}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="brand">Trading Journal — Local</div>
+      <div class="controls">
+        <label class="btn" id="uploadLabel">Upload File<input id="fileInput" type="file" accept=".xlsx,.xls,.csv"/></label>
+        <select id="dateSelect" class="btn"></select>
+        <div class="view-toggle">
+          <button id="dailyBtn" class="btn primary">Daily</button>
+          <button id="monthlyBtn" class="btn">Monthly</button>
+          <button id="ytdBtn" class="btn">YTD</button>
+        </div>
+        <button id="setupStatsBtn" class="btn">Setup Stats</button>
+        <button id="calendarBtn" class="btn">Calendar</button>
+        <button id="resetBtn" class="btn">Reset</button>
+      </div>
+    </div>
+
+    <!-- Full-year calendar section (hidden by default) -->
+    <div id="fullCalendarSection" style="display:none; margin-top:14px">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:700">Year Calendar</div>
+          <div>
+            <select id="yearSelect" class="btn"></select>
+            <button id="backBtn" class="btn">Back</button>
+          </div>
+        </div>
+        <div id="yearCalendar" style="margin-top:12px; display:grid; grid-template-columns:repeat(3,1fr); gap:12px"></div>
+      </div>
+    </div>
+
+    <!-- Setup Performance section (hidden by default) -->
+    <div id="setupStatsSection" style="display:none; margin-top:14px">
+      <div class="card">
+        <div style="font-weight:700">Setup Performance</div>
+        <table class="table" id="setupStatsTable">
+          <thead><tr><th>Setup</th><th>Direction</th><th>Trades</th><th>Wins</th><th>Losses</th><th>Winrate %</th><th>Total PnL</th><th>Avg</th><th>Avg Win</th><th>Avg Loss</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <div class="card">
+          <div class="header-row">
+            <div>
+              <div id="selectedDate" style="font-size:16px;font-weight:700">No data loaded</div>
+              <div class="small" id="selectedMeta">Upload an Excel or CSV file with trades</div>
+            </div>
+          </div>
+          <div class="stats" id="topStats">
+            <div class="stat">
+              <div class="small">Trades</div>
+              <div class="v" id="statTrades">—</div>
+            </div>
+            <div class="stat">
+              <div class="small" id="pnlLabel">Daily PnL</div>
+              <div class="v" id="statPnL">—</div>
+            </div>
+            <div class="stat">
+              <div class="small">Avg per Trade</div>
+              <div class="v" id="statAvg">—</div>
+            </div>
+            <div class="stat">
+              <div class="small">Avg Win</div>
+              <div class="v" id="statAvgWin">—</div>
+            </div>
+            <div class="stat">
+              <div class="small">Avg Loss</div>
+              <div class="v" id="statAvgLoss">—</div>
+            </div>
+            <div class="stat">
+              <div class="small">Win Rate %</div>
+              <div class="v" id="statWinRate">—</div>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="mainChart"></canvas>
+          </div>
+          <div id="dayNotesSection" style="margin-top:12px; display:none">
+            <div style="font-weight:700; margin-bottom:6px">Day Notes</div>
+            <textarea id="dayNotesTextarea" rows="3" style="width:100%; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); color:#e6eef6; padding:8px; border-radius:8px; resize:vertical"></textarea>
+            <button id="saveDayNotesBtn" class="btn" style="margin-top:6px">Save Day Notes</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <div style="font-weight:700">Symbol Analytics</div>
+          <table class="table" id="symbolTable">
+            <thead><tr><th>Symbol</th><th>Trades</th><th>Setup</th><th>PnL</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div id="symbolDetails" style="margin-top:10px"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-weight:700">Symbols Summary</div>
+            <div class="small" id="rightMeta"></div>
+          </div>
+          <table class="table" id="rightTable">
+            <thead><tr><th>Symbol</th><th>Trades</th><th>Setup</th><th>PnL</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-weight:700">Monthly Summary</div>
+            <div class="small" id="monthMeta">—</div>
+          </div>
+          <div style="height:180px;margin-top:8px">
+            <canvas id="miniChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Logical fields for multi-broker compatibility
+    const LOGICAL_FIELDS = {
+      closedDate: { required: true, aliases: ["closed", "close time", "exit time", "date", "trade date", "datetime"] },
+      symbol: { required: true, aliases: ["symbol", "ticker", "instrument", "asset"] },
+      netPnL: { required: true, aliases: ["net", "pnl", "profit", "realized pnl", "net pnl"] },
+      openedDate: { required: false, aliases: ["opened", "open time", "entry time"] },
+      entryPrice: { required: false, aliases: ["entry", "entry price", "buy price"] },
+      exitPrice: { required: false, aliases: ["exit", "exit price", "sell price"] },
+      qty: { required: false, aliases: ["qty", "quantity", "size", "shares"] },
+      grossPnL: { required: false, aliases: ["gross", "gross pnl", "profit gross"] },
+      fees: { required: false, aliases: ["fees", "commission", "comm", "ecn fee", "total fees"] }
+    };
+
+    // App state
+    let trades = []; // each trade: {Opened:Date, Closed:Date, Symbol, NET:number, raw:object, tradeId:string}
+    let perDay = {}; // yyyy-mm-dd -> {trades:[], totalNet, symbolMap}
+    let perMonth = {}; // yyyy-mm -> {days:{}, totalNet, trades}
+    let currentView = 'daily';
+    let mainChart=null, miniChart=null;
+
+    // Helpers
+    function fmtDate(d){ if(!d) return '—'; return d.toLocaleString(); }
+    function ymd(d){ const z = new Date(d); return z.getFullYear()+"-"+String(z.getMonth()+1).padStart(2,'0')+"-"+String(z.getDate()).padStart(2,'0'); }
+    function yM(d){ const z=new Date(d); return z.getFullYear()+"-"+String(z.getMonth()+1).padStart(2,'0'); }
+
+    function computeTradeStats(tradeList) {
+      if (!tradeList || tradeList.length === 0) return { avgWin: 0, avgLoss: 0, winRate: 0 };
+      let wins = 0, losses = 0, sumWins = 0, sumLosses = 0;
+      tradeList.forEach(t => {
+        if (t.NET > 0) {
+          wins++;
+          sumWins += t.NET;
+        } else if (t.NET < 0) {
+          losses++;
+          sumLosses += t.NET;
+        }
+      });
+      const avgWin = wins > 0 ? sumWins / wins : 0;
+      const avgLoss = losses > 0 ? sumLosses / losses : 0;
+      const winRate = tradeList.length > 0 ? (wins / tradeList.length) * 100 : 0;
+      return { avgWin, avgLoss, winRate };
+    }
+
+    function mostCommon(arr) {
+      if (!arr || arr.length === 0) return '';
+      const freq = {};
+      arr.forEach(x => freq[x] = (freq[x] || 0) + 1);
+      let max = 0, res = '';
+      for (let k in freq) if (freq[k] > max) { max = freq[k]; res = k; }
+      return res;
+    }
+
+    // localStorage helpers
+    function saveTradesToStorage(){
+      try {
+        localStorage.setItem('tradingJournalTrades', JSON.stringify(trades));
+      } catch(e) {
+        console.error('Failed to save trades to localStorage:', e);
+      }
+    }
+    function rebuildAggregations(){
+      perDay = {};
+      perMonth = {};
+      trades.forEach(t=>{
+        const d = ymd(t.Closed);
+        if(!perDay[d]) perDay[d] = {trades:[], totalNet:0, symbolMap:{}};
+        perDay[d].trades.push(t);
+        perDay[d].totalNet += t.NET;
+        const sym = t.Symbol || '—';
+        if(!perDay[d].symbolMap[sym]) perDay[d].symbolMap[sym] = {trades:0, net:0};
+        perDay[d].symbolMap[sym].trades += 1;
+        perDay[d].symbolMap[sym].net += t.NET;
+
+        const m = yM(t.Closed);
+        if(!perMonth[m]) perMonth[m] = {days:{}, totalNet:0, trades:0};
+        if(!perMonth[m].days[d]) perMonth[m].days[d] = {net:0, trades:0};
+        perMonth[m].days[d].net += t.NET;
+        perMonth[m].days[d].trades += 1;
+        perMonth[m].totalNet += t.NET;
+        perMonth[m].trades += 1;
+      });
+    }
+    function loadTradesFromStorage(){
+      try {
+        const stored = localStorage.getItem('tradingJournalTrades');
+        if(stored) {
+          const parsed = JSON.parse(stored);
+          // Rehydrate dates
+          trades = parsed.map(t => ({
+            ...t,
+            Opened: t.Opened ? new Date(t.Opened) : null,
+            Closed: t.Closed ? new Date(t.Closed) : null,
+            tradeId: t.tradeId || getTradeId(t) // ensure tradeId is set
+          }));
+          rebuildAggregations();
+          populateDateSelector();
+          updateMiniChart();
+          updateSetupStats();
+          // Pick latest date
+          const dates = Object.keys(perDay).sort();
+          if(dates.length>0){ 
+            document.getElementById('dateSelect').value = dates[dates.length-1]; 
+            onDateChange(); 
+          }
+        }
+      } catch(e) {
+        console.error('Failed to load trades from localStorage:', e);
+        trades = [];
+      }
+    }
+    function clearAllData(){
+      localStorage.removeItem('tradingJournalTrades');
+      // Also clear all notes and setups
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if(key.startsWith('tradeNote:') || key.startsWith('dayNote:') || key.startsWith('setup:')) {
+          localStorage.removeItem(key);
+        }
+      });
+    }
+
+    function updateSetupStats(){
+      const setupStats = {};
+      trades.forEach(t => {
+        const setup = loadSetup(t.tradeId);
+        const qty = t.raw && (t.raw.Qty || t.raw.qty) ? parseFloat(t.raw.Qty || t.raw.qty) : 0;
+        const direction = qty > 0 ? 'Long' : 'Short';
+        const key = setup + '|' + direction;
+        if (!setupStats[key]) setupStats[key] = { setup, direction, trades: 0, wins: 0, losses: 0, totalNet: 0, sumWins: 0, sumLosses: 0 };
+        setupStats[key].trades++;
+        if (t.NET > 0) {
+          setupStats[key].wins++;
+          setupStats[key].sumWins += t.NET;
+        } else {
+          setupStats[key].losses++;
+          setupStats[key].sumLosses += t.NET;
+        }
+        setupStats[key].totalNet += t.NET;
+      });
+      const entries = Object.values(setupStats).map(data => ({
+        ...data,
+        winrate: data.trades > 0 ? (data.wins / data.trades * 100).toFixed(1) : 0,
+        avg: data.trades > 0 ? (data.totalNet / data.trades).toFixed(2) : 0,
+        avgWin: data.wins > 0 ? (data.sumWins / data.wins).toFixed(2) : 0,
+        avgLoss: data.losses > 0 ? (data.sumLosses / data.losses).toFixed(2) : 0
+      }));
+      entries.sort((a, b) => b.totalNet - a.totalNet);
+      const tbody = document.getElementById('setupStatsTable').querySelector('tbody');
+      tbody.innerHTML = '';
+      entries.forEach(entry => {
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td'); td1.textContent = entry.setup;
+        const td2 = document.createElement('td'); td2.textContent = entry.direction;
+        const td3 = document.createElement('td'); td3.textContent = entry.trades;
+        const td4 = document.createElement('td'); td4.textContent = entry.wins;
+        const td5 = document.createElement('td'); td5.textContent = entry.losses;
+        const td6 = document.createElement('td'); td6.textContent = entry.winrate + '%';
+        td6.className = entry.winrate >= 50 ? 'p-green' : 'p-red';
+        const td7 = document.createElement('td'); td7.textContent = formatPnL(entry.totalNet);
+        td7.className = entry.totalNet >= 0 ? 'p-green' : 'p-red';
+        const td8 = document.createElement('td'); td8.textContent = entry.avg;
+        td8.className = parseFloat(entry.avg) >= 0 ? 'p-green' : 'p-red';
+        const td9 = document.createElement('td'); td9.textContent = entry.avgWin;
+        td9.className = 'p-green';
+        const td10 = document.createElement('td'); td10.textContent = entry.avgLoss;
+        td10.className = 'p-red';
+        tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td5); tr.appendChild(td6); tr.appendChild(td7); tr.appendChild(td8); tr.appendChild(td9); tr.appendChild(td10);
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Robust date parser for a variety of formats and Excel serials
+    function parseFlexibleDate(v){
+      if(v===undefined || v===null || v==='') return null;
+      // Date object
+      if(v instanceof Date && !isNaN(v)) return v;
+      // Excel serialized date (number)
+      if(typeof v === 'number'){
+        // Excel serial to JS date (handles 1900 leap bug by offset)
+        const excelEpoch = new Date(Date.UTC(1899,11,30));
+        const ms = (v - 0) * 24*60*60*1000;
+        const d = new Date(excelEpoch.getTime() + ms);
+        if(!isNaN(d)) return d;
+      }
+      if(typeof v === 'string'){
+        // Try ISO/standard first
+        let d = new Date(v);
+        if(!isNaN(d)) return d;
+        
+        // Common dd/mm/yyyy or dd-mm-yyyy patterns
+        const m = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:\s+(.*))?$/);
+        if(m){
+          const day = parseInt(m[1],10); const mon=parseInt(m[2],10); const yr=parseInt(m[3],10);
+          const rest = m[4]||'';
+          
+          // Try dd/mm/yyyy first (European format)
+          d = new Date(yr<100?yr+2000:yr, mon-1, day, ...parseTimeParts(rest));
+          if(!isNaN(d)) return d;
+          
+          // If that failed, try mm/dd/yyyy (US format)
+          d = new Date(yr<100?yr+2000:yr, day-1, mon, ...parseTimeParts(rest));
+          if(!isNaN(d)) return d;
+        }
+        
+        // Additional date format detection
+        const parts = v.split(/[ T]/)[0].split(/[\/\-\.]/);
+        if(parts.length===3){
+          const a=parseInt(parts[0],10), b=parseInt(parts[1],10), c=parseInt(parts[2],10);
+          
+          // Intelligent format detection based on value ranges
+          // If first part > 12, likely dd/mm/yyyy
+          if(a > 12){
+            d = new Date(c<100?c+2000:c, b-1, a);
+            if(!isNaN(d)) return d;
+          }
+          // If second part > 12, likely mm/dd/yyyy
+          else if(b > 12){
+            d = new Date(c<100?c+2000:c, a-1, b);
+            if(!isNaN(d)) return d;
+          }
+          // Ambiguous, try both
+          else {
+            // Try mm/dd/yyyy first
+            d = new Date(c<100?c+2000:c, a-1, b);
+            if(!isNaN(d)) return d;
+            // Try dd/mm/yyyy
+            d = new Date(c<100?c+2000:c, b-1, a);
+            if(!isNaN(d)) return d;
+          }
+        }
+      }
+      return null;
+    }
+
+    function parseTimeParts(t){
+      if(!t) return [0,0,0];
+      const hhmm = t.split(':').map(x=>parseInt(x,10)||0);
+      return [hhmm[0]||0, hhmm[1]||0, hhmm[2]||0];
+    }
+
+    // File handling
+    document.getElementById('fileInput').addEventListener('change', async (e)=>{
+      const f = e.target.files[0]; if(!f) return;
+      try{
+        const data = await f.arrayBuffer();
+        const wb = XLSX.read(data, {type:'array'});
+        
+        // Multi-sheet handling: find sheet with highest logical field match score
+        let bestSheet = null;
+        let bestScore = 0;
+        let bestSheetName = '';
+        
+        for (const sheetName of wb.SheetNames) {
+          const sheet = wb.Sheets[sheetName];
+          const raw = XLSX.utils.sheet_to_json(sheet, {header:1, defval:null});
+          if (!raw || raw.length === 0) continue;
+          
+          // Quick score calculation for this sheet
+          const scanRows = Math.min(20, raw.length);
+          let sheetScore = 0;
+          
+          for (let i = 0; i < scanRows; i++) {
+            const row = raw[i] || [];
+            const normalizedHeaders = row.map(h => String(h||'').trim().toLowerCase().replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim());
+            
+            let rowScore = 0;
+            for (const [logicalField, config] of Object.entries(LOGICAL_FIELDS)) {
+              for (const norm of normalizedHeaders) {
+                if (config.aliases.some(alias => norm === alias || norm.replace(/\s+/g,'') === alias.replace(/\s+/g,'') || norm.includes(alias))) {
+                  rowScore++;
+                  break;
+                }
+              }
+            }
+            
+            if (rowScore > sheetScore) {
+              sheetScore = rowScore;
+            }
+          }
+          
+          if (sheetScore > bestScore) {
+            bestScore = sheetScore;
+            bestSheet = sheet;
+            bestSheetName = sheetName;
+          }
+        }
+        
+        if (!bestSheet) {
+          alert('No suitable data found in any sheet');
+          return;
+        }
+        
+        console.log(`Selected sheet "${bestSheetName}" with score ${bestScore}`);
+        handleSheet(bestSheet);
+      }catch(err){
+        alert('Error reading file: '+err.message);
+        console.error(err);
+      }
+    });
+
+    function handleSheet(sheet){
+      // Read sheet as raw arrays (no headers assumed)
+      const raw = XLSX.utils.sheet_to_json(sheet, {header:1, defval:null});
+      if(!raw || raw.length===0){ alert('No rows found in file'); return; }
+
+      // Load existing trades for incremental import
+      const existingTrades = [...trades]; // copy current trades
+      const existingIds = new Set(existingTrades.map(t => t.tradeId || getTradeId(t)));
+
+      // Normalization helper: trim, lowercase, remove special chars, collapse spaces
+      function normalizeHeader(h){ return String(h||'').trim().toLowerCase().replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim(); }
+
+      // Check if headers match original strict format
+      function isOriginalFormat(headerRow) {
+        const normalized = headerRow.map(normalizeHeader);
+        const required = ['opened', 'closed', 'symbol', 'entry', 'exit', 'qty', 'gross', 'net'];
+        return required.every(req => normalized.some(h => h === req || h.replace(/\s+/g,'') === req));
+      }
+
+      // Generate hash of headers for mapping persistence
+      function hashHeaders(headers) {
+        const normalized = headers.map(normalizeHeader).sort().join('|');
+        let hash = 0;
+        for (let i = 0; i < normalized.length; i++) {
+          const char = normalized.charCodeAt(i);
+          hash = ((hash << 5) - hash) + char;
+          hash = hash & hash; // Convert to 32bit integer
+        }
+        return 'excelProfile:' + Math.abs(hash);
+      }
+
+      // Map headers to logical fields with priority rules
+      function mapHeadersToLogical(headerRow) {
+        const mapping = {};
+        const normalizedHeaders = headerRow.map(normalizeHeader);
+        
+        for (const [logicalField, config] of Object.entries(LOGICAL_FIELDS)) {
+          let bestIndex = -1;
+          let bestScore = 0; // 0 = no match, 1 = substring, 2 = exact, 3 = full alias exact
+          
+          for (let i = 0; i < normalizedHeaders.length; i++) {
+            const norm = normalizedHeaders[i];
+            const normNoSpace = norm.replace(/\s+/g,'');
+            
+            for (const alias of config.aliases) {
+              const aliasNoSpace = alias.replace(/\s+/g,'');
+              
+              // Priority 3: Exact match with spaces
+              if (norm === alias) {
+                if (bestScore < 3) {
+                  bestScore = 3;
+                  bestIndex = i;
+                }
+                break; // Highest priority, no need to check others
+              }
+              
+              // Priority 2: Exact match without spaces
+              if (normNoSpace === aliasNoSpace) {
+                if (bestScore < 2) {
+                  bestScore = 2;
+                  bestIndex = i;
+                }
+                continue; // Check if there's an exact match
+              }
+              
+              // Priority 1: Substring match
+              if (norm.includes(alias) && bestScore < 2) {
+                bestScore = 1;
+                bestIndex = i;
+              }
+            }
+          }
+          
+          if (bestIndex !== -1) {
+            mapping[logicalField] = bestIndex;
+          }
+        }
+        return mapping;
+      }
+
+      // Scan first 20 rows to detect header row
+      const scanRows = Math.min(20, raw.length);
+      let bestIndex = -1, bestScore = 0;
+      for (let i = 0; i < scanRows; i++) {
+        const row = raw[i] || [];
+        const mapping = mapHeadersToLogical(row);
+        const score = Object.keys(mapping).length;
+        if (score > bestScore) {
+          bestScore = score;
+          bestIndex = i;
+        }
+      }
+
+      if (bestScore === 0 || bestIndex === -1) {
+        alert('Could not detect header row automatically');
+        return;
+      }
+
+      const headerRow = raw[bestIndex] || [];
+      const columnMapping = mapHeadersToLogical(headerRow);
+
+      // Check if original format
+      const originalFormat = isOriginalFormat(headerRow);
+
+      // Load or save mapping
+      const headersHash = hashHeaders(headerRow);
+      let storedMapping = localStorage.getItem(headersHash);
+      if (storedMapping) {
+        try {
+          columnMapping = JSON.parse(storedMapping);
+        } catch (e) {
+          console.warn('Failed to parse stored mapping:', e);
+        }
+      } else {
+        localStorage.setItem(headersHash, JSON.stringify(columnMapping));
+      }
+
+      // Validate required fields
+      const missingRequired = Object.entries(LOGICAL_FIELDS)
+        .filter(([field, config]) => config.required && !(field in columnMapping))
+        .map(([field]) => field);
+
+      if (missingRequired.length > 0) {
+        alert(`Could not map required fields: ${missingRequired.join(', ')}`);
+        return;
+      }
+
+      // If original format, use existing logic
+      if (originalFormat) {
+        // Use the old HEADER_MAP for backward compatibility
+        const HEADER_MAP = {
+          'opened':'Opened', 'closed':'Closed', 'held':'Held', 'symbol':'Symbol', 'type':'Type', 'entry':'Entry', 'exit':'Exit',
+          'qty':'Qty','quantity':'Qty','gross':'Gross','comm':'Comm','commission':'Comm',
+          'ecnfee':'Ecn Fee','sec':'SEC','taf':'TAF','nscc':'NSCC','clr':'CLR',
+          'orf':'ORF','orffee':'ORF','orffee':'ORF','orf fee':'ORF','ptfpf':'PTFPF','eftt':'EFTT','cat':'CAT',
+          'net':'NET','pnl':'NET'
+        };
+        const normalizedHeaders = {};
+        for(let j=0;j<headerRow.length;j++){
+          const rawH = headerRow[j];
+          const norm = normalizeHeader(rawH);
+          const keyNoSpace = norm.replace(/\s+/g,'');
+          const canonical = HEADER_MAP[keyNoSpace] || HEADER_MAP[norm];
+          if(canonical && normalizedHeaders[canonical] === undefined){
+            normalizedHeaders[canonical] = { original: rawH, index: j, normalized: norm };
+          }
+        }
+        const missing = ['Opened','Closed','Symbol','NET'].filter(c=>!normalizedHeaders[c]);
+        if(missing.length>0){
+          alert('Missing required columns: '+missing.join(', '));
+          return;
+        }
+        const headerIndexMap = {};
+        for(const k of Object.keys(normalizedHeaders)) headerIndexMap[k] = normalizedHeaders[k].index;
+
+        // Parse using old logic
+        for(let r = bestIndex+1; r < raw.length; r++){
+          const arr = raw[r] || [];
+          const mapped = {};
+          for(const canonical of ['Opened','Closed','Symbol','Entry','Exit','Qty','Gross','NET']){
+            const idx = headerIndexMap[canonical];
+            mapped[canonical] = (idx !== undefined && idx < arr.length) ? arr[idx] : null;
+          }
+          const any = ['Opened','Closed','Symbol','NET'].some(k => mapped[k] !== null && mapped[k] !== undefined && String(mapped[k]).trim() !== '');
+          if(!any) continue;
+          const openedRaw = mapped['Opened'];
+          const closedRaw = mapped['Closed'];
+          const opened = parseFlexibleDate(openedRaw);
+          let closed = parseFlexibleDate(closedRaw);
+          const timeOnlyRegex = /^\s*\d{1,2}:\d{2}(?::\d{2})?\s*$/;
+          if((!closed || !(closed instanceof Date) || isNaN(closed)) && typeof closedRaw === 'string' && timeOnlyRegex.test(closedRaw) && opened instanceof Date && !isNaN(opened)){
+            const parts = parseTimeParts(closedRaw.trim());
+            closed = new Date(opened.getFullYear(), opened.getMonth(), opened.getDate(), parts[0], parts[1]||0, parts[2]||0);
+            if(opened instanceof Date && closed < opened){ closed.setDate(closed.getDate()+1); }
+          }
+          const net = Number(String(mapped['NET']).replace(/[^0-9\-\.]/g,'')) || 0;
+          const symbol = String(mapped['Symbol'] || '').trim();
+          const t = {Opened:opened, Closed:closed, Symbol:symbol, NET:net, raw:mapped};
+          trades.push(t);
+        }
+      } else {
+        // New multi-broker parsing logic
+        // Parse rows below header
+        for(let r = bestIndex+1; r < raw.length; r++){
+          const arr = raw[r] || [];
+          
+          // Extract logical fields
+          const logicalData = {};
+          for (const [field, index] of Object.entries(columnMapping)) {
+            logicalData[field] = (index < arr.length) ? arr[index] : null;
+          }
+          
+          // Skip empty rows
+          const hasData = Object.values(logicalData).some(val => val !== null && String(val).trim() !== '');
+          if (!hasData) continue;
+          
+          // Parse dates
+          let closedDate = parseFlexibleDate(logicalData.closedDate);
+          let openedDate = logicalData.openedDate ? parseFlexibleDate(logicalData.openedDate) : closedDate;
+          
+          // Handle time-only closed dates
+          const timeOnlyRegex = /^\s*\d{1,2}:\d{2}(?::\d{2})?\s*$/;
+          if ((!closedDate || !(closedDate instanceof Date) || isNaN(closedDate)) && 
+              typeof logicalData.closedDate === 'string' && 
+              timeOnlyRegex.test(logicalData.closedDate) && 
+              openedDate instanceof Date && !isNaN(openedDate)) {
+            const parts = parseTimeParts(logicalData.closedDate.trim());
+            closedDate = new Date(openedDate.getFullYear(), openedDate.getMonth(), openedDate.getDate(), parts[0], parts[1]||0, parts[2]||0);
+            if (openedDate instanceof Date && closedDate < openedDate) { 
+              closedDate.setDate(closedDate.getDate() + 1); 
+            }
+          }
+          
+          // Parse PnL
+          let netPnL = 0;
+          if (logicalData.netPnL !== null) {
+            netPnL = Number(String(logicalData.netPnL).replace(/[^0-9\-\.]/g,'')) || 0;
+          } else if (logicalData.grossPnL !== null && logicalData.fees !== null) {
+            const gross = Number(String(logicalData.grossPnL).replace(/[^0-9\-\.]/g,'')) || 0;
+            const fees = Number(String(logicalData.fees).replace(/[^0-9\-\.]/g,'')) || 0;
+            netPnL = gross - fees;
+          }
+          
+          // Parse other fields
+          const symbol = String(logicalData.symbol || '').trim();
+          const entryPrice = logicalData.entryPrice ? Number(String(logicalData.entryPrice).replace(/[^0-9\.]/g,'')) || null : null;
+          const exitPrice = logicalData.exitPrice ? Number(String(logicalData.exitPrice).replace(/[^0-9\.]/g,'')) || null : null;
+          const qty = logicalData.qty ? Number(String(logicalData.qty).replace(/[^0-9\.]/g,'')) || null : null;
+          
+          // Create raw object for backward compatibility
+          const raw = {
+            Opened: openedDate,
+            Closed: closedDate,
+            Symbol: symbol,
+            Entry: entryPrice,
+            Exit: exitPrice,
+            Qty: qty,
+            NET: netPnL
+          };
+          
+          const t = {Opened: openedDate, Closed: closedDate, Symbol: symbol, NET: netPnL, raw: raw};
+          trades.push(t);
+        }
+      }
+
+      // Debugging: if no trades parsed, surface detected header info and sample rows
+      if(trades.length === 0){
+        const detectedHeaders = headerRow.map(x=>String(x||'')).join(', ');
+        const sample = raw.slice(bestIndex, Math.min(raw.length, bestIndex+6)).map(r=>JSON.stringify(r)).join('\n');
+        const msg = 'No trades parsed from sheet.\nDetected header row index: '+bestIndex+' (score:'+bestScore+').\nHeader row: '+detectedHeaders+'\nSample rows (header + next rows):\n'+sample;
+        console.log(msg);
+        alert(msg);
+        return;
+      }
+
+      // Filter only completed trades with Closed date
+      const beforeFilterCount = trades.length;
+      trades = trades.filter(t=>t.Closed instanceof Date && !isNaN(t.Closed));
+      // Debug: log how many parsed vs how many have valid Closed dates
+      console.log('Trades parsed:', beforeFilterCount, 'Completed (has Closed date):', trades.length);
+      // If we lost all trades due to missing/invalid Closed dates, show diagnostics
+      if(trades.length === 0){
+        const sampleMapped = raw.slice(bestIndex+1, Math.min(raw.length, bestIndex+6)).map((row, idx)=>{
+          const mapped = {};
+          for(const [field, index] of Object.entries(columnMapping)){
+            mapped[field] = (index < (row||[]).length) ? (row||[])[index] : null;
+          }
+          return mapped;
+        });
+        const msg = 'No completed trades found after parsing.\nParsed rows: '+beforeFilterCount+"\nCompleted (Closed date parsed): 0\nDetected header row index: "+bestIndex+" (score:"+bestScore+")\nSample mapped rows (first few):\n"+JSON.stringify(sampleMapped,null,2);
+        console.log(msg);
+        alert(msg);
+        return;
+      }
+
+      // Add tradeId to each trade for duplicate detection
+      trades.forEach(t => t.tradeId = getTradeId(t));
+
+      // Explicit duplicate protection using tradeId
+      const newTrades = [];
+      const duplicateIds = [];
+      
+      for (const trade of trades) {
+        if (existingIds.has(trade.tradeId)) {
+          duplicateIds.push(trade.tradeId);
+        } else {
+          newTrades.push(trade);
+        }
+      }
+      
+      console.log(`Duplicate protection: ${newTrades.length} new trades added, ${duplicateIds.length} duplicates skipped`);
+      if (duplicateIds.length > 0) {
+        console.log('Skipped duplicate tradeIds:', duplicateIds.slice(0, 5), duplicateIds.length > 5 ? `...and ${duplicateIds.length - 5} more` : '');
+      }
+
+      // Merge new trades into existing
+      trades = [...existingTrades, ...newTrades];
+
+      // Sort by Closed timestamp
+      trades.sort((a,b)=>a.Closed - b.Closed);
+
+      // Rebuild aggregations
+      rebuildAggregations();
+
+      populateDateSelector();
+      // Pick latest date by default
+      const dates = Object.keys(perDay).sort();
+      if(dates.length>0){ document.getElementById('dateSelect').value = dates[dates.length-1]; onDateChange(); }
+      updateMiniChart();
+      // Save to localStorage
+      saveTradesToStorage();
+      updateSetupStats();
+    }
+
+    // Populate date selector
+    function populateDateSelector(){
+      const sel = document.getElementById('dateSelect'); sel.innerHTML='';
+      const days = Object.keys(perDay).sort();
+      days.forEach(d=>{
+        const opt = document.createElement('option'); opt.value=d; opt.textContent=d; sel.appendChild(opt);
+      });
+    }
+
+    document.getElementById('dateSelect').addEventListener('change', onDateChange);
+    document.getElementById('dailyBtn').addEventListener('click', ()=>{currentView='daily'; document.getElementById('dailyBtn').classList.add('primary'); document.getElementById('monthlyBtn').classList.remove('primary'); document.getElementById('ytdBtn').classList.remove('primary'); onDateChange();});
+    document.getElementById('monthlyBtn').addEventListener('click', ()=>{currentView='monthly'; document.getElementById('monthlyBtn').classList.add('primary'); document.getElementById('dailyBtn').classList.remove('primary'); document.getElementById('ytdBtn').classList.remove('primary'); onDateChange();});
+    document.getElementById('ytdBtn').addEventListener('click', ()=>{currentView='ytd'; document.getElementById('ytdBtn').classList.add('primary'); document.getElementById('dailyBtn').classList.remove('primary'); document.getElementById('monthlyBtn').classList.remove('primary'); onDateChange();});
+    document.getElementById('resetBtn').addEventListener('click', ()=>{ if(confirm('Clear all data? This will delete all trades and notes from localStorage.')){ clearAllData(); trades=[]; perDay={}; perMonth={}; currentView='daily'; document.getElementById('dateSelect').innerHTML=''; renderEmpty(); } });
+    document.getElementById('setupStatsBtn').addEventListener('click', ()=>{ const section = document.getElementById('setupStatsSection'); if(section.style.display === 'none' || section.style.display === ''){ section.style.display = 'block'; updateSetupStats(); } else { section.style.display = 'none'; } });
+
+    // Calendar button behavior
+    document.getElementById('calendarBtn').addEventListener('click', ()=>{
+      // show full calendar section and hide main grid
+      document.querySelector('.grid').style.display = 'none';
+      document.getElementById('fullCalendarSection').style.display = 'block';
+      // populate year selector
+      const years = Array.from(new Set(trades.map(t=> (t.Closed instanceof Date) ? t.Closed.getFullYear() : null ).filter(Boolean))).sort();
+      const ys = document.getElementById('yearSelect'); ys.innerHTML='';
+      if(years.length===0){ const opt = document.createElement('option'); opt.textContent='No data'; ys.appendChild(opt); return; }
+      years.forEach(y=>{ const opt=document.createElement('option'); opt.value=y; opt.textContent=y; ys.appendChild(opt); });
+      ys.value = years[years.length-1]; renderFullYearCalendar(Number(ys.value));
+    });
+
+    document.getElementById('backBtn').addEventListener('click', ()=>{
+      document.getElementById('fullCalendarSection').style.display='none';
+      document.querySelector('.grid').style.display = '';
+    });
+
+    document.getElementById('yearSelect').addEventListener('change', (e)=>{ renderFullYearCalendar(Number(e.target.value)); });
+
+    function onDateChange(){
+      const sel = document.getElementById('dateSelect'); const d = sel.value;
+      let monthKey = null;
+      if(currentView === 'ytd'){
+        document.getElementById('selectedDate').textContent = 'Year to Date';
+        document.getElementById('selectedMeta').textContent = 'All trades';
+        document.getElementById('pnlLabel').textContent = 'YTD PnL';
+        // Hide day notes and setup stats
+        document.getElementById('dayNotesSection').style.display = 'none';
+        document.getElementById('setupStatsSection').style.display = 'none';
+        renderYTDView();
+        return;
+      }
+      if(!d){
+        // If no date is selected but user asked for monthly view, fall back to latest available month
+        if(currentView === 'monthly'){
+          const months = Object.keys(perMonth).sort();
+          if(months.length === 0){ renderEmpty(); return; }
+          monthKey = months[months.length-1];
+          document.getElementById('selectedDate').textContent = monthKey;
+        } else {
+          renderEmpty(); return;
+        }
+      } else {
+        monthKey = d.slice(0,7);
+      }
+      const dayData = d ? perDay[d] : null;
+      document.getElementById('selectedDate').textContent = d;
+      document.getElementById('selectedMeta').textContent = currentView==='daily' ? 'Daily view' : 'Monthly view';
+      if(currentView === 'daily'){
+        document.getElementById('pnlLabel').textContent = 'Daily PnL';
+        document.getElementById('statTrades').textContent = dayData ? dayData.trades.length : '0';
+        document.getElementById('statPnL').innerHTML = dayData ? formatPnL(dayData.totalNet) : '—';
+        document.getElementById('statAvg').textContent = dayData ? (dayData.totalNet/dayData.trades.length||0).toFixed(2) : '—';
+        const stats = computeTradeStats(dayData ? dayData.trades : []);
+        document.getElementById('statAvgWin').textContent = stats.avgWin.toFixed(2);
+        document.getElementById('statAvgLoss').textContent = stats.avgLoss.toFixed(2);
+        document.getElementById('statWinRate').textContent = stats.winRate.toFixed(1) + '%';
+        // Update symbol tables for the day
+        updateSymbolTables(d);
+        renderDailyView(d);
+        // Show day notes
+        document.getElementById('dayNotesSection').style.display = 'block';
+        document.getElementById('dayNotesTextarea').value = loadDayNote(d);
+      } else {
+        // Hide day notes in monthly view
+        document.getElementById('dayNotesSection').style.display = 'none';
+        document.getElementById('setupStatsSection').style.display = 'none';
+        const monthData = perMonth[monthKey] || {totalNet:0, trades:0};
+        document.getElementById('statTrades').textContent = monthData.trades || '0';
+        document.getElementById('statPnL').innerHTML = formatPnL(monthData.totalNet || 0);
+        document.getElementById('statAvg').textContent = monthData.trades ? (monthData.totalNet/monthData.trades).toFixed(2) : '—';
+        const monthTrades = trades.filter(t => yM(t.Closed) === monthKey);
+        const stats = computeTradeStats(monthTrades);
+        document.getElementById('statAvgWin').textContent = stats.avgWin.toFixed(2);
+        document.getElementById('statAvgLoss').textContent = stats.avgLoss.toFixed(2);
+        document.getElementById('statWinRate').textContent = stats.winRate.toFixed(1) + '%';
+        // Update symbol tables aggregated for the month
+        updateSymbolTablesForMonth(monthKey);
+        renderMonthlyView(monthKey);
+        renderCalendar(monthKey);
+        // Show setup stats
+        document.getElementById('setupStatsSection').style.display = 'block';
+        updateSetupStats();
+      }
+    }
+
+    function renderEmpty(){
+      document.getElementById('selectedDate').textContent='No data loaded';
+      document.getElementById('selectedMeta').textContent='Upload an Excel or CSV file with trades';
+      clearChart(mainChart);
+      clearChart(miniChart);
+      document.getElementById('symbolTable').querySelector('tbody').innerHTML='';
+      document.getElementById('rightTable').querySelector('tbody').innerHTML='';
+      document.getElementById('statTrades').textContent='—';
+      document.getElementById('statPnL').textContent='—';
+      document.getElementById('statAvg').textContent='—';
+      document.getElementById('statAvgWin').textContent='—';
+      document.getElementById('statAvgLoss').textContent='—';
+      document.getElementById('statWinRate').textContent='—';
+    }
+
+    function clearChart(c){ if(c){ c.destroy(); } }
+
+    function updateSymbolTables(dateKey){
+      const dayData = perDay[dateKey] || {symbolMap:{}, trades:[]};
+      const dayTrades = dayData.trades;
+      // Right panel summary
+      const rightBody = document.getElementById('rightTable').querySelector('tbody'); rightBody.innerHTML='';
+      const entries = Object.entries(dayData.symbolMap || {});
+      entries.sort((a,b)=>Math.abs(b[1].net)-Math.abs(a[1].net));
+      entries.forEach(([sym,info])=>{
+        const symbolTrades = dayTrades.filter(t => t.Symbol === sym);
+        const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
+        const mostCommonSetup = mostCommon(setups) || 'No Setup';
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td'); td1.textContent=sym;
+        const td2 = document.createElement('td'); td2.textContent=info.trades;
+        const td_setup = document.createElement('td'); td_setup.textContent=mostCommonSetup;
+        const td3 = document.createElement('td'); td3.textContent=formatPnL(info.net); td3.className = info.net>=0? 'p-green':'';
+        if(info.net<0) td3.className='p-red';
+        // show note preview for this symbol/day
+        const notePreview = getNotesPreviewForSymbol(sym, dateKey, 'day');
+        if(notePreview) { const span = document.createElement('span'); span.style.marginLeft='8px'; span.style.fontSize='12px'; span.style.opacity='0.9'; span.textContent = '📝 '+notePreview; td3.appendChild(span); }
+        tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); rightBody.appendChild(tr);
+        // make row clickable to show per-trade details/notes for this day
+        tr.style.cursor = 'pointer'; tr.addEventListener('click', ()=> showSymbolDetails(sym, dateKey, 'day'));
+      });
+
+      // Detailed symbol table (left)
+      const leftBody = document.getElementById('symbolTable').querySelector('tbody'); leftBody.innerHTML='';
+      entries.forEach(([sym,info])=>{
+        const symbolTrades = dayTrades.filter(t => t.Symbol === sym);
+        const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
+        const mostCommonSetup = mostCommon(setups) || 'No Setup';
+        const tr = document.createElement('tr');
+        const td1=document.createElement('td'); td1.textContent=sym;
+        const td2=document.createElement('td'); td2.textContent=info.trades;
+        const td_setup=document.createElement('td'); td_setup.textContent=mostCommonSetup;
+        const td3=document.createElement('td'); td3.textContent=formatPnL(info.net);
+        td3.className = info.net>=0? 'p-green':'p-red';
+        // add inline note preview in left table as well
+        const notePreview = getNotesPreviewForSymbol(sym, dateKey, 'day');
+        if(notePreview){ const span = document.createElement('span'); span.style.marginLeft='8px'; span.style.fontSize='12px'; span.style.opacity='0.9'; span.textContent = '📝 '+notePreview; td3.appendChild(span); }
+        tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); leftBody.appendChild(tr);
+        tr.style.cursor='pointer'; tr.addEventListener('click', ()=> showSymbolDetails(sym, dateKey, 'day'));
+      });
+    }
+
+    function getNotesPreviewForSymbol(symbol, key, scope){
+      // Collect notes for trades matching symbol and scope and return short preview
+      const matches = trades.filter(t=>t.Symbol===symbol && (scope==='day' ? ymd(t.Closed)===key : yM(t.Closed)===key));
+      const notes = [];
+      matches.forEach(t=>{ const id = getTradeId(t); const n = loadNote(id); if(n) notes.push(n); });
+      if(notes.length===0) return '';
+      const merged = notes.join(' | ');
+      return merged.length>40? merged.slice(0,40)+'…': merged;
+    }
+
+    function updateSymbolTablesForMonth(monthKey){
+      // Aggregate trades by symbol across the given month
+      const agg = {};
+      let totalTrades = 0, totalNet = 0;
+      trades.forEach(t=>{
+        if(!(t.Closed instanceof Date) || isNaN(t.Closed)) return;
+        if(yM(t.Closed) !== monthKey) return;
+        const s = t.Symbol || '—';
+        if(!agg[s]) agg[s] = {trades:0, net:0};
+        agg[s].trades += 1; agg[s].net += t.NET;
+        totalTrades += 1; totalNet += t.NET;
+      });
+
+      const entries = Object.entries(agg).sort((a,b)=>Math.abs(b[1].net)-Math.abs(a[1].net));
+      const rightBody = document.getElementById('rightTable').querySelector('tbody'); rightBody.innerHTML = '';
+      entries.forEach(([sym,info])=>{
+        const symbolTrades = trades.filter(t => yM(t.Closed) === monthKey && t.Symbol === sym);
+        const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
+        const mostCommonSetup = mostCommon(setups) || 'No Setup';
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'';
+        if(info.net<0) td3.className='p-red';
+        const notePreview = getNotesPreviewForSymbol(sym, monthKey, 'month');
+        if(notePreview){ const span = document.createElement('span'); span.style.marginLeft='8px'; span.style.fontSize='12px'; span.style.opacity='0.9'; span.textContent = '📝 '+notePreview; td3.appendChild(span); }
+        tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); rightBody.appendChild(tr);
+        tr.style.cursor='pointer'; tr.addEventListener('click', ()=> showSymbolDetails(sym, monthKey, 'month'));
+      });
+
+      const leftBody = document.getElementById('symbolTable').querySelector('tbody'); leftBody.innerHTML = '';
+      entries.forEach(([sym,info])=>{
+        const symbolTrades = trades.filter(t => yM(t.Closed) === monthKey && t.Symbol === sym);
+        const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
+        const mostCommonSetup = mostCommon(setups) || 'No Setup';
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'p-red'; tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); leftBody.appendChild(tr);
+        tr.style.cursor='pointer'; tr.addEventListener('click', ()=> showSymbolDetails(sym, monthKey, 'month'));
+      });
+
+      document.getElementById('rightMeta').textContent = `Month: ${monthKey} • Trades: ${totalTrades} • PnL: ${formatPnL(totalNet)}`;
+    }
+
+    function updateSymbolTablesYTD(){
+      // Aggregate trades by symbol across all time
+      const agg = {};
+      let totalTrades = 0, totalNet = 0;
+      trades.forEach(t=>{
+        const s = t.Symbol || '—';
+        if(!agg[s]) agg[s] = {trades:0, net:0};
+        agg[s].trades += 1; agg[s].net += t.NET;
+        totalTrades += 1; totalNet += t.NET;
+      });
+
+      const entries = Object.entries(agg).sort((a,b)=>Math.abs(b[1].net)-Math.abs(a[1].net));
+      const rightBody = document.getElementById('rightTable').querySelector('tbody'); rightBody.innerHTML = '';
+      entries.forEach(([sym,info])=>{
+        const symbolTrades = trades.filter(t => t.Symbol === sym);
+        const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
+        const mostCommonSetup = mostCommon(setups) || 'No Setup';
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'';
+        if(info.net<0) td3.className='p-red';
+        tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); rightBody.appendChild(tr);
+        // For YTD, no notes preview or click since no specific key
+      });
+
+      const leftBody = document.getElementById('symbolTable').querySelector('tbody'); leftBody.innerHTML = '';
+      entries.forEach(([sym,info])=>{
+        const symbolTrades = trades.filter(t => t.Symbol === sym);
+        const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
+        const mostCommonSetup = mostCommon(setups) || 'No Setup';
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'p-red'; tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); leftBody.appendChild(tr);
+      });
+
+      document.getElementById('rightMeta').textContent = `YTD • Trades: ${totalTrades} • PnL: ${formatPnL(totalNet)}`;
+    }
+
+    // Notes storage helpers
+    function getTradeId(trade){
+      // Deterministic tradeId using Closed + Symbol + Entry + Exit + Qty + NET
+      const closedTs = trade.Closed instanceof Date ? trade.Closed.getTime() : String(trade.Closed || '');
+      const symbol = String(trade.Symbol || '').trim();
+      const entry = String(trade.raw && trade.raw.Entry || '').trim();
+      const exit = String(trade.raw && trade.raw.Exit || '').trim();
+      const qty = String(trade.raw && (trade.raw.Qty || trade.raw.qty) || '').trim();
+      const net = String(trade.NET || '').trim();
+      return `${closedTs}|${symbol}|${entry}|${exit}|${qty}|${net}`;
+    }
+    function loadNote(id){ return localStorage.getItem('tradeNote:'+id) || ''; }
+    function saveNote(id, text){ localStorage.setItem('tradeNote:'+id, text); }
+    function loadDayNote(dateKey){ return localStorage.getItem('dayNote:'+dateKey) || ''; }
+    function saveDayNote(dateKey, text){ localStorage.setItem('dayNote:'+dateKey, text); }
+    function loadSetup(tradeId){ return localStorage.getItem('setup:'+tradeId) || 'No Setup'; }
+    function saveSetup(tradeId, setup){ localStorage.setItem('setup:'+tradeId, setup); }
+
+    function showSymbolDetails(symbol, key, scope){
+      // scope: 'day' or 'month', key is dateKey (yyyy-mm-dd) or monthKey (yyyy-mm)
+      const container = document.getElementById('symbolDetails'); container.innerHTML = '';
+      const header = document.createElement('div'); header.style.display='flex'; header.style.justifyContent='space-between'; header.style.alignItems='center'; header.style.marginBottom='8px';
+      const title = document.createElement('div'); title.style.fontWeight='700'; title.textContent = `Trades for ${symbol} (${scope==='day'?key:key})`;
+      const closeBtn = document.createElement('button'); closeBtn.className='btn'; closeBtn.textContent='Close'; closeBtn.addEventListener('click', () => { container.innerHTML = ''; });
+      header.appendChild(title); header.appendChild(closeBtn);
+      container.appendChild(header);
+      const tbl = document.createElement('table'); tbl.className='table'; const thead = document.createElement('thead'); thead.innerHTML = '<tr><th>Opened</th><th>Closed</th><th>Qty</th><th>NET</th><th>Setup</th><th>Note</th></tr>'; tbl.appendChild(thead);
+      const tbody = document.createElement('tbody'); tbl.appendChild(tbody);
+      // find matching trades
+      const rows = trades.filter(t=>t.Symbol===symbol && (scope==='day' ? ymd(t.Closed)===key : yM(t.Closed)===key));
+      rows.forEach(t=>{
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td'); td1.textContent = t.Opened instanceof Date? t.Opened.toLocaleString() : String(t.Opened||'');
+        const td2 = document.createElement('td'); td2.textContent = t.Closed instanceof Date? t.Closed.toLocaleString() : String(t.Closed||'');
+        const td3 = document.createElement('td'); td3.textContent = t.raw && (t.raw.Qty || t.raw.qty) ? String(t.raw.Qty||t.raw.qty) : '';
+        const td4 = document.createElement('td'); td4.textContent = formatPnL(t.NET); td4.className = t.NET>=0? 'p-green':'p-red';
+        const td5 = document.createElement('td');
+        const select = document.createElement('select');
+        select.className = 'btn';
+        ['GyE', 'FRD', 'SIR', 'FailedPmh', 'PMHBO', 'No Setup'].forEach(opt => {
+          const option = document.createElement('option');
+          option.value = opt;
+          option.textContent = opt;
+          select.appendChild(option);
+        });
+        const id = getTradeId(t);
+        select.value = loadSetup(id);
+        select.addEventListener('change', () => {
+          saveSetup(id, select.value);
+          updateSetupStats();
+          if(scope === 'day') updateSymbolTables(key);
+          else if(scope === 'month') updateSymbolTablesForMonth(key);
+        });
+        td5.appendChild(select);
+        const td6 = document.createElement('td');
+        const ta = document.createElement('textarea'); ta.rows=2; ta.style.width='100%'; ta.value = loadNote(id);
+        const btn = document.createElement('button'); btn.className='btn'; btn.style.marginTop='6px'; btn.textContent='Save'; btn.addEventListener('click', ()=>{ saveNote(id, ta.value); btn.textContent='Saved'; setTimeout(()=>btn.textContent='Save',800); });
+        td6.appendChild(ta); td6.appendChild(btn);
+        tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td5); tr.appendChild(td6); tbody.appendChild(tr);
+      });
+      container.appendChild(tbl);
+    }
+
+    // Calendar rendering for a given monthKey (yyyy-mm)
+    function renderCalendar(monthKey){
+      const cal = document.getElementById('calendar'); cal.innerHTML='';
+      if(!perMonth[monthKey]){ document.getElementById('calendarMeta').textContent = 'No data for '+monthKey; return; }
+      const ym = monthKey.split('-'); const year = parseInt(ym[0],10); const month = parseInt(ym[1],10)-1;
+      const first = new Date(year, month, 1); const daysInMonth = new Date(year, month+1, 0).getDate();
+      // headers
+      const weekDays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      weekDays.forEach(w=>{ const d = document.createElement('div'); d.className='cal-day header'; d.textContent = w; cal.appendChild(d); });
+      // pad first week
+      for(let i=0;i<first.getDay();i++){ const d = document.createElement('div'); d.className='cal-day'; cal.appendChild(d); }
+      for(let day=1; day<=daysInMonth; day++){
+        const dKey = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        const val = (perMonth[monthKey].days[dKey] && perMonth[monthKey].days[dKey].net) || 0;
+        const cell = document.createElement('div'); cell.className='cal-day';
+        const dayOfWeek = new Date(year, month, day).getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        if(isWeekend && val === 0){
+          cell.classList.add('weekend');
+          cell.innerHTML = `<div style="font-weight:700">${day}</div>`;
+        } else {
+          cell.innerHTML = `<div style="font-weight:700">${day}</div><div>${formatPnL(val)}</div>`;
+        }
+        if(val>0) cell.classList.add('positive'); else if(val<0) cell.classList.add('negative');
+        cell.addEventListener('click', ()=>{ document.getElementById('dateSelect').value = dKey; document.getElementById('dailyBtn').click(); onDateChange(); });
+        cal.appendChild(cell);
+      }
+      document.getElementById('calendarMeta').textContent = `Month: ${monthKey}`;
+    }
+
+    // Full-year calendar renderer
+    function renderFullYearCalendar(year){
+      const container = document.getElementById('yearCalendar'); container.innerHTML = '';
+      for(let m=0;m<12;m++){
+        const monthBox = document.createElement('div'); monthBox.className='month-box';
+        const monthTitle = document.createElement('div'); monthTitle.className='month-title'; monthTitle.textContent = `${year} - ${m+1}`; monthBox.appendChild(monthTitle);
+        const monthGrid = document.createElement('div'); monthGrid.className='month-grid';
+        // weekday headers
+        ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(w=>{ const h=document.createElement('div'); h.className='cal-day header'; h.textContent=w; monthGrid.appendChild(h); });
+        const first = new Date(year, m, 1); const daysInMonth = new Date(year, m+1, 0).getDate();
+        for(let i=0;i<first.getDay();i++){ const d=document.createElement('div'); d.className='cal-day'; monthGrid.appendChild(d); }
+        for(let d=1; d<=daysInMonth; d++){
+          const dKey = `${year}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          const val = (perMonth[`${year}-${String(m+1).padStart(2,'0')}`] && perMonth[`${year}-${String(m+1).padStart(2,'0')}`].days[dKey] && perMonth[`${year}-${String(m+1).padStart(2,'0')}`].days[dKey].net) || 0;
+          const cell = document.createElement('div'); cell.className='cal-day';
+          const dayOfWeek = new Date(year, m, d).getDay();
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          if(isWeekend && val === 0){
+            cell.classList.add('weekend');
+            cell.innerHTML = `<div style="font-weight:700">${d}</div>`;
+          } else {
+            cell.innerHTML = `<div style="font-weight:700">${d}</div><div>${formatPnL(val)}</div>`;
+          }
+          if(val>0) cell.classList.add('positive'); else if(val<0) cell.classList.add('negative');
+          cell.addEventListener('click', ()=>{ document.getElementById('dateSelect').value = dKey; currentView='daily'; document.getElementById('dailyBtn').classList.add('primary'); document.getElementById('monthlyBtn').classList.remove('primary'); document.getElementById('ytdBtn').classList.remove('primary'); document.getElementById('fullCalendarSection').style.display='none'; document.querySelector('.grid').style.display=''; onDateChange(); });
+          monthGrid.appendChild(cell);
+        }
+        monthBox.appendChild(monthGrid);
+        container.appendChild(monthBox);
+      }
+    }
+
+    function formatPnL(v){ const n = Number(v)||0; const s = n>=0? '+'+n.toFixed(2): n.toFixed(2); return s; }
+
+    // DAILY VIEW chart: intraday cumulative curve using Closed time order
+    function renderDailyView(dateKey){
+      const day = perDay[dateKey]; if(!day) { clearChart(mainChart); return; }
+      const sorted = day.trades.slice().sort((a,b)=>a.Closed-b.Closed);
+      // cumulative
+      let cum=0; const labels=[]; const dataVals=[]; const pointColors=[];
+      sorted.forEach(t=>{
+        const timeLabel = t.Closed instanceof Date ? t.Closed.toLocaleTimeString() : String(t.Closed);
+        labels.push(timeLabel);
+        cum += t.NET;
+        dataVals.push(cum);
+        pointColors.push(cum >= 0 ? '#00c853' : '#ff5252');
+      });
+      // ensure starts at 0 (prepend)
+      labels.unshift('start'); dataVals.unshift(0); pointColors.unshift('#888');
+
+      // Chart.js using category x-axis (avoids needing a date adapter)
+      clearChart(mainChart);
+      const ctx = document.getElementById('mainChart').getContext('2d');
+      mainChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Intraday Equity',
+            data: dataVals,
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: 3,
+            pointBackgroundColor: pointColors,
+            borderColor: '#888'
+          }]
+        },
+        options: {
+          scales: {
+            x: { type: 'category', grid: { color: 'rgba(255,255,255,0.03)' } },
+            y: { grid: { color: 'rgba(255,255,255,0.03)' } }
+          },
+          plugins: { legend: { display: false } }
+        },
+        plugins: [{
+          id: 'colorLine',
+          beforeDatasetDraw(chart, args, options){
+            const ds = chart.data.datasets[0];
+            ds.segment = ds.segment || {};
+            ds.segment.borderColor = ctx => (ctx.p0.parsed.y >= 0 && ctx.p1.parsed.y >= 0) ? '#00c853' : (ctx.p0.parsed.y < 0 && ctx.p1.parsed.y < 0) ? '#ff5252' : '#888';
+          }
+        }]
+      });
+    }
+
+    // MONTHLY VIEW: monthly cumulative curve and daily bars
+    function renderMonthlyView(monthKey){
+      const month = perMonth[monthKey]; if(!month){ clearChart(mainChart); return; }
+      const days = Object.keys(month.days).sort();
+      const labels = days;
+      const daily = days.map(d=>month.days[d].net);
+      // cumulative across days
+      const cum = []; let s=0; daily.forEach(v=>{ s+=v; cum.push(s); });
+
+      clearChart(mainChart);
+      const ctx = document.getElementById('mainChart').getContext('2d');
+      mainChart = new Chart(ctx, {
+        type:'bar', data:{labels:labels, datasets:[{type:'bar', label:'Daily Net', data:daily, backgroundColor: daily.map(v=> v>=0? '#007f3f':'#b00020')}, {type:'line', label:'Monthly Equity', data:cum, borderColor:'#00c853', borderWidth:2, fill:false, tension:0.2}]},
+        options:{scales:{x:{grid:{color:'rgba(255,255,255,0.03)'}}, y:{grid:{color:'rgba(255,255,255,0.03)'}}}, plugins:{legend:{display:true}} }
+      });
+
+      document.getElementById('monthMeta').textContent = `Trades: ${month.trades} • PnL: ${formatPnL(month.totalNet)}`;
+    }
+
+    function renderYTDView(){
+      if(trades.length === 0){ clearChart(mainChart); return; }
+      const sorted = trades.slice().sort((a,b)=>a.Closed - b.Closed);
+      let cum = 0; const labels = []; const dataVals = [];
+      sorted.forEach(t=>{
+        cum += t.NET;
+        const dateLabel = t.Closed instanceof Date ? t.Closed.toLocaleDateString() : String(t.Closed);
+        labels.push(dateLabel);
+        dataVals.push(cum);
+      });
+      clearChart(mainChart);
+      const ctx = document.getElementById('mainChart').getContext('2d');
+      mainChart = new Chart(ctx, {
+        type:'line', data:{labels:labels, datasets:[{label:'YTD Equity', data:dataVals, borderColor:'#00c853', borderWidth:2, fill:false, tension:0.2}]},
+        options:{scales:{x:{grid:{color:'rgba(255,255,255,0.03)'}}, y:{grid:{color:'rgba(255,255,255,0.03)'}}}, plugins:{legend:{display:true}} }
+      });
+      // Update stats
+      const totalTrades = trades.length;
+      const totalPnL = trades.reduce((s,t)=>s+t.NET, 0);
+      const avg = totalTrades ? totalPnL / totalTrades : 0;
+      document.getElementById('statTrades').textContent = totalTrades;
+      document.getElementById('statPnL').innerHTML = formatPnL(totalPnL);
+      document.getElementById('statAvg').textContent = avg.toFixed(2);
+      const stats = computeTradeStats(trades);
+      document.getElementById('statAvgWin').textContent = stats.avgWin.toFixed(2);
+      document.getElementById('statAvgLoss').textContent = stats.avgLoss.toFixed(2);
+      document.getElementById('statWinRate').textContent = stats.winRate.toFixed(1) + '%';
+      // Update symbol tables for YTD
+      updateSymbolTablesYTD();
+    }
+
+    // Mini chart shows month overview when available
+    function updateMiniChart(){
+      clearChart(miniChart);
+      const months = Object.keys(perMonth).sort(); if(months.length===0) return;
+      const latest = months[months.length-1];
+      const m = perMonth[latest];
+      const days = Object.keys(m.days).sort(); const labels = days; const vals = days.map(d=>m.days[d].net);
+      const ctx = document.getElementById('miniChart').getContext('2d');
+      miniChart = new Chart(ctx, {type:'bar', data:{labels, datasets:[{label:'Daily PnL', data:vals, backgroundColor: vals.map(v=>v>=0? '#00c853':'#ff5252')}]}, options:{plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{display:false}}}});
+    }
+
+    // utility: safe number
+    function toNum(v){ return Number(String(v).replace(/[^0-9\-\.]/g,''))||0; }
+
+    // initial empty state
+    loadTradesFromStorage();
+    if(trades.length === 0) {
+      renderEmpty();
+    }
+
+    document.getElementById('saveDayNotesBtn').addEventListener('click', ()=>{
+      const dateKey = document.getElementById('dateSelect').value;
+      const text = document.getElementById('dayNotesTextarea').value;
+      saveDayNote(dateKey, text);
+      document.getElementById('saveDayNotesBtn').textContent = 'Saved';
+      setTimeout(() => document.getElementById('saveDayNotesBtn').textContent = 'Save Day Notes', 800);
+    });
+
+    // Allow dropping file onto window
+    window.addEventListener('dragover', e=>e.preventDefault());
+    window.addEventListener('drop', async (e)=>{ e.preventDefault(); if(e.dataTransfer.files.length>0){ const f=e.dataTransfer.files[0]; document.getElementById('fileInput').files = e.dataTransfer.files; const ev = new Event('change'); document.getElementById('fileInput').dispatchEvent(ev); } });
+
+  </script>
+</body>
+</html>
