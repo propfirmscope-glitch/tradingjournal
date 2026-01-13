@@ -968,12 +968,34 @@
       entries.forEach(([sym,info])=>{
         const symbolTrades = dayTrades.filter(t => t.Symbol === sym);
         const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
-        const mostCommonSetup = mostCommon(setups) || 'Unclassified';
+        const allSame = setups.length > 0 && setups.every(s => s === setups[0]);
+        const displaySetup = allSame ? setups[0] : 'Mixed';
         const tr = document.createElement('tr');
         const td1 = document.createElement('td'); td1.textContent=sym;
         const td2 = document.createElement('td'); td2.textContent=info.trades;
-        const td_setup = document.createElement('td'); td_setup.textContent=mostCommonSetup;
-        if(mostCommonSetup === 'Unclassified') td_setup.title = 'No setup assigned yet';
+        const td_setup = document.createElement('td'); td_setup.textContent=displaySetup;
+        if(displaySetup === 'Unclassified') td_setup.title = 'No setup assigned yet';
+        td_setup.style.cursor = 'pointer';
+        td_setup.addEventListener('click', () => {
+          if (td_setup.querySelector('select')) return;
+          const select = document.createElement('select');
+          select.className = 'btn';
+          ['GyE', 'FRD', 'SIR', 'FailedPmh', 'PMHBO', 'Unclassified'].forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt;
+            option.textContent = opt;
+            select.appendChild(option);
+          });
+          select.value = displaySetup === 'Mixed' ? 'Unclassified' : displaySetup;
+          select.addEventListener('change', () => {
+            symbolTrades.forEach(t => saveSetup(getTradeId(t), select.value));
+            updateSetupStats();
+            updateSymbolTables(dateKey);
+          });
+          td_setup.innerHTML = '';
+          td_setup.appendChild(select);
+          select.focus();
+        });
         const td3 = document.createElement('td'); td3.textContent=formatPnL(info.net); td3.className = info.net>=0? 'p-green':'';
         if(info.net<0) td3.className='p-red';
         // show note preview for this symbol/day
@@ -989,11 +1011,34 @@
       entries.forEach(([sym,info])=>{
         const symbolTrades = dayTrades.filter(t => t.Symbol === sym);
         const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
-        const mostCommonSetup = mostCommon(setups) || 'No Setup';
+        const allSame = setups.length > 0 && setups.every(s => s === setups[0]);
+        const displaySetup = allSame ? setups[0] : 'Mixed';
         const tr = document.createElement('tr');
         const td1=document.createElement('td'); td1.textContent=sym;
         const td2=document.createElement('td'); td2.textContent=info.trades;
-        const td_setup=document.createElement('td'); td_setup.textContent=mostCommonSetup;
+        const td_setup=document.createElement('td'); td_setup.textContent=displaySetup;
+        if(displaySetup === 'Unclassified') td_setup.title = 'No setup assigned yet';
+        td_setup.style.cursor = 'pointer';
+        td_setup.addEventListener('click', () => {
+          if (td_setup.querySelector('select')) return;
+          const select = document.createElement('select');
+          select.className = 'btn';
+          ['GyE', 'FRD', 'SIR', 'FailedPmh', 'PMHBO', 'Unclassified'].forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt;
+            option.textContent = opt;
+            select.appendChild(option);
+          });
+          select.value = displaySetup === 'Mixed' ? 'Unclassified' : displaySetup;
+          select.addEventListener('change', () => {
+            symbolTrades.forEach(t => saveSetup(getTradeId(t), select.value));
+            updateSetupStats();
+            updateSymbolTables(dateKey);
+          });
+          td_setup.innerHTML = '';
+          td_setup.appendChild(select);
+          select.focus();
+        });
         const td3=document.createElement('td'); td3.textContent=formatPnL(info.net);
         td3.className = info.net>=0? 'p-green':'p-red';
         // add inline note preview in left table as well
@@ -1032,9 +1077,30 @@
       entries.forEach(([sym,info])=>{
         const symbolTrades = trades.filter(t => yM(t.Closed) === monthKey && t.Symbol === sym);
         const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
-        const mostCommonSetup = mostCommon(setups) || 'Unclassified';
+        const allSame = setups.length > 0 && setups.every(s => s === setups[0]);
+        const displaySetup = allSame ? setups[0] : 'Mixed';
         const tr = document.createElement('tr');
-        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; if(mostCommonSetup === 'Unclassified') td_setup.title = 'No setup assigned yet'; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'';
+        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = displaySetup; if(displaySetup === 'Unclassified') td_setup.title = 'No setup assigned yet'; td_setup.style.cursor = 'pointer';
+        td_setup.addEventListener('click', () => {
+          if (td_setup.querySelector('select')) return;
+          const select = document.createElement('select');
+          select.className = 'btn';
+          ['GyE', 'FRD', 'SIR', 'FailedPmh', 'PMHBO', 'Unclassified'].forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt;
+            option.textContent = opt;
+            select.appendChild(option);
+          });
+          select.value = displaySetup === 'Mixed' ? 'Unclassified' : displaySetup;
+          select.addEventListener('change', () => {
+            symbolTrades.forEach(t => saveSetup(getTradeId(t), select.value));
+            updateSetupStats();
+            updateSymbolTablesForMonth(monthKey);
+          });
+          td_setup.innerHTML = '';
+          td_setup.appendChild(select);
+          select.focus();
+        }); const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'';
         if(info.net<0) td3.className='p-red';
         const notePreview = getNotesPreviewForSymbol(sym, monthKey, 'month');
         if(notePreview){ const span = document.createElement('span'); span.style.marginLeft='8px'; span.style.fontSize='12px'; span.style.opacity='0.9'; span.textContent = '📝 '+notePreview; td3.appendChild(span); }
@@ -1046,9 +1112,30 @@
       entries.forEach(([sym,info])=>{
         const symbolTrades = trades.filter(t => yM(t.Closed) === monthKey && t.Symbol === sym);
         const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
-        const mostCommonSetup = mostCommon(setups) || 'Unclassified';
+        const allSame = setups.length > 0 && setups.every(s => s === setups[0]);
+        const displaySetup = allSame ? setups[0] : 'Mixed';
         const tr = document.createElement('tr');
-        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; if(mostCommonSetup === 'Unclassified') td_setup.title = 'No setup assigned yet'; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'p-red'; tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); leftBody.appendChild(tr);
+        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = displaySetup; if(displaySetup === 'Unclassified') td_setup.title = 'No setup assigned yet'; td_setup.style.cursor = 'pointer';
+        td_setup.addEventListener('click', () => {
+          if (td_setup.querySelector('select')) return;
+          const select = document.createElement('select');
+          select.className = 'btn';
+          ['GyE', 'FRD', 'SIR', 'FailedPmh', 'PMHBO', 'Unclassified'].forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt;
+            option.textContent = opt;
+            select.appendChild(option);
+          });
+          select.value = displaySetup === 'Mixed' ? 'Unclassified' : displaySetup;
+          select.addEventListener('change', () => {
+            symbolTrades.forEach(t => saveSetup(getTradeId(t), select.value));
+            updateSetupStats();
+            updateSymbolTablesForMonth(monthKey);
+          });
+          td_setup.innerHTML = '';
+          td_setup.appendChild(select);
+          select.focus();
+        }); const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'p-red'; tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); leftBody.appendChild(tr);
         tr.style.cursor='pointer'; tr.addEventListener('click', ()=> showSymbolDetails(sym, monthKey, 'month'));
       });
 
@@ -1071,9 +1158,30 @@
       entries.forEach(([sym,info])=>{
         const symbolTrades = trades.filter(t => t.Symbol === sym);
         const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
-        const mostCommonSetup = mostCommon(setups) || 'Unclassified';
+        const allSame = setups.length > 0 && setups.every(s => s === setups[0]);
+        const displaySetup = allSame ? setups[0] : 'Mixed';
         const tr = document.createElement('tr');
-        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; if(mostCommonSetup === 'Unclassified') td_setup.title = 'No setup assigned yet'; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'';
+        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = displaySetup; if(displaySetup === 'Unclassified') td_setup.title = 'No setup assigned yet'; td_setup.style.cursor = 'pointer';
+        td_setup.addEventListener('click', () => {
+          if (td_setup.querySelector('select')) return;
+          const select = document.createElement('select');
+          select.className = 'btn';
+          ['GyE', 'FRD', 'SIR', 'FailedPmh', 'PMHBO', 'Unclassified'].forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt;
+            option.textContent = opt;
+            select.appendChild(option);
+          });
+          select.value = displaySetup === 'Mixed' ? 'Unclassified' : displaySetup;
+          select.addEventListener('change', () => {
+            symbolTrades.forEach(t => saveSetup(getTradeId(t), select.value));
+            updateSetupStats();
+            updateSymbolTablesYTD();
+          });
+          td_setup.innerHTML = '';
+          td_setup.appendChild(select);
+          select.focus();
+        }); const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'';
         if(info.net<0) td3.className='p-red';
         tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); rightBody.appendChild(tr);
         // For YTD, no notes preview or click since no specific key
@@ -1083,9 +1191,30 @@
       entries.forEach(([sym,info])=>{
         const symbolTrades = trades.filter(t => t.Symbol === sym);
         const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
-        const mostCommonSetup = mostCommon(setups) || 'Unclassified';
+        const allSame = setups.length > 0 && setups.every(s => s === setups[0]);
+        const displaySetup = allSame ? setups[0] : 'Mixed';
         const tr = document.createElement('tr');
-        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; if(mostCommonSetup === 'Unclassified') td_setup.title = 'No setup assigned yet'; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'p-red'; tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); leftBody.appendChild(tr);
+        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = displaySetup; if(displaySetup === 'Unclassified') td_setup.title = 'No setup assigned yet'; td_setup.style.cursor = 'pointer';
+        td_setup.addEventListener('click', () => {
+          if (td_setup.querySelector('select')) return;
+          const select = document.createElement('select');
+          select.className = 'btn';
+          ['GyE', 'FRD', 'SIR', 'FailedPmh', 'PMHBO', 'Unclassified'].forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt;
+            option.textContent = opt;
+            select.appendChild(option);
+          });
+          select.value = displaySetup === 'Mixed' ? 'Unclassified' : displaySetup;
+          select.addEventListener('change', () => {
+            symbolTrades.forEach(t => saveSetup(getTradeId(t), select.value));
+            updateSetupStats();
+            updateSymbolTablesYTD();
+          });
+          td_setup.innerHTML = '';
+          td_setup.appendChild(select);
+          select.focus();
+        }); const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'p-red'; tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); leftBody.appendChild(tr);
       });
 
       document.getElementById('rightMeta').textContent = `YTD • Trades: ${totalTrades} • PnL: ${formatPnL(totalNet)}`;
