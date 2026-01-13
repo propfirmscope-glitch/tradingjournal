@@ -138,6 +138,26 @@
               <div class="small">Win Rate %</div>
               <div class="v" id="statWinRate">—</div>
             </div>
+            <div class="stat">
+              <div class="small">R:R</div>
+              <div class="v" id="statRR">—</div>
+            </div>
+            <div class="stat">
+              <div class="small">Best Day</div>
+              <div class="v" id="statBestDay">—</div>
+            </div>
+            <div class="stat">
+              <div class="small">Worst Day</div>
+              <div class="v" id="statWorstDay">—</div>
+            </div>
+            <div class="stat">
+              <div class="small">Max DD</div>
+              <div class="v" id="statMaxDD">—</div>
+            </div>
+            <div class="stat">
+              <div class="small">Expectancy</div>
+              <div class="v" id="statExpectancy">—</div>
+            </div>
           </div>
           <div class="chart-wrap">
             <canvas id="mainChart"></canvas>
@@ -337,7 +357,8 @@
       tbody.innerHTML = '';
       entries.forEach(entry => {
         const tr = document.createElement('tr');
-        const td1 = document.createElement('td'); td1.textContent = entry.setup;
+        const td1 = document.createElement('td'); td1.textContent = entry.setup === 'No Setup' ? 'Unclassified' : entry.setup;
+        if(td1.textContent === 'Unclassified') td1.title = 'No setup assigned yet';
         const td2 = document.createElement('td'); td2.textContent = entry.direction;
         const td3 = document.createElement('td'); td3.textContent = entry.trades;
         const td4 = document.createElement('td'); td4.textContent = entry.wins;
@@ -716,7 +737,7 @@
           const qty = logicalData.qty ? Number(String(logicalData.qty).replace(/[^0-9\.]/g,'')) || null : null;
           
           // Create raw object for backward compatibility
-          const raw = {
+          const rawData = {
             Opened: openedDate,
             Closed: closedDate,
             Symbol: symbol,
@@ -726,7 +747,7 @@
             NET: netPnL
           };
           
-          const t = {Opened: openedDate, Closed: closedDate, Symbol: symbol, NET: netPnL, raw: raw};
+          const t = {Opened: openedDate, Closed: closedDate, Symbol: symbol, NET: netPnL, raw: rawData};
           trades.push(t);
         }
       }
@@ -874,6 +895,12 @@
         document.getElementById('statAvgWin').textContent = stats.avgWin.toFixed(2);
         document.getElementById('statAvgLoss').textContent = stats.avgLoss.toFixed(2);
         document.getElementById('statWinRate').textContent = stats.winRate.toFixed(1) + '%';
+        const rr = stats.avgLoss !== 0 ? (stats.avgWin / Math.abs(stats.avgLoss)).toFixed(2) : '—';
+        document.getElementById('statRR').textContent = rr;
+        document.getElementById('statBestDay').textContent = '—';
+        document.getElementById('statWorstDay').textContent = '—';
+        document.getElementById('statMaxDD').textContent = '—';
+        document.getElementById('statExpectancy').textContent = '—';
         // Update symbol tables for the day
         updateSymbolTables(d);
         renderDailyView(d);
@@ -893,6 +920,12 @@
         document.getElementById('statAvgWin').textContent = stats.avgWin.toFixed(2);
         document.getElementById('statAvgLoss').textContent = stats.avgLoss.toFixed(2);
         document.getElementById('statWinRate').textContent = stats.winRate.toFixed(1) + '%';
+        const rr = stats.avgLoss !== 0 ? (stats.avgWin / Math.abs(stats.avgLoss)).toFixed(2) : '—';
+        document.getElementById('statRR').textContent = rr;
+        document.getElementById('statBestDay').textContent = '—';
+        document.getElementById('statWorstDay').textContent = '—';
+        document.getElementById('statMaxDD').textContent = '—';
+        document.getElementById('statExpectancy').textContent = '—';
         // Update symbol tables aggregated for the month
         updateSymbolTablesForMonth(monthKey);
         renderMonthlyView(monthKey);
@@ -916,6 +949,11 @@
       document.getElementById('statAvgWin').textContent='—';
       document.getElementById('statAvgLoss').textContent='—';
       document.getElementById('statWinRate').textContent='—';
+      document.getElementById('statRR').textContent='—';
+      document.getElementById('statBestDay').textContent='—';
+      document.getElementById('statWorstDay').textContent='—';
+      document.getElementById('statMaxDD').textContent='—';
+      document.getElementById('statExpectancy').textContent='—';
     }
 
     function clearChart(c){ if(c){ c.destroy(); } }
@@ -930,11 +968,12 @@
       entries.forEach(([sym,info])=>{
         const symbolTrades = dayTrades.filter(t => t.Symbol === sym);
         const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
-        const mostCommonSetup = mostCommon(setups) || 'No Setup';
+        const mostCommonSetup = mostCommon(setups) || 'Unclassified';
         const tr = document.createElement('tr');
         const td1 = document.createElement('td'); td1.textContent=sym;
         const td2 = document.createElement('td'); td2.textContent=info.trades;
         const td_setup = document.createElement('td'); td_setup.textContent=mostCommonSetup;
+        if(mostCommonSetup === 'Unclassified') td_setup.title = 'No setup assigned yet';
         const td3 = document.createElement('td'); td3.textContent=formatPnL(info.net); td3.className = info.net>=0? 'p-green':'';
         if(info.net<0) td3.className='p-red';
         // show note preview for this symbol/day
@@ -993,9 +1032,9 @@
       entries.forEach(([sym,info])=>{
         const symbolTrades = trades.filter(t => yM(t.Closed) === monthKey && t.Symbol === sym);
         const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
-        const mostCommonSetup = mostCommon(setups) || 'No Setup';
+        const mostCommonSetup = mostCommon(setups) || 'Unclassified';
         const tr = document.createElement('tr');
-        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'';
+        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; if(mostCommonSetup === 'Unclassified') td_setup.title = 'No setup assigned yet'; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'';
         if(info.net<0) td3.className='p-red';
         const notePreview = getNotesPreviewForSymbol(sym, monthKey, 'month');
         if(notePreview){ const span = document.createElement('span'); span.style.marginLeft='8px'; span.style.fontSize='12px'; span.style.opacity='0.9'; span.textContent = '📝 '+notePreview; td3.appendChild(span); }
@@ -1007,9 +1046,9 @@
       entries.forEach(([sym,info])=>{
         const symbolTrades = trades.filter(t => yM(t.Closed) === monthKey && t.Symbol === sym);
         const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
-        const mostCommonSetup = mostCommon(setups) || 'No Setup';
+        const mostCommonSetup = mostCommon(setups) || 'Unclassified';
         const tr = document.createElement('tr');
-        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'p-red'; tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); leftBody.appendChild(tr);
+        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; if(mostCommonSetup === 'Unclassified') td_setup.title = 'No setup assigned yet'; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'p-red'; tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); leftBody.appendChild(tr);
         tr.style.cursor='pointer'; tr.addEventListener('click', ()=> showSymbolDetails(sym, monthKey, 'month'));
       });
 
@@ -1032,9 +1071,9 @@
       entries.forEach(([sym,info])=>{
         const symbolTrades = trades.filter(t => t.Symbol === sym);
         const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
-        const mostCommonSetup = mostCommon(setups) || 'No Setup';
+        const mostCommonSetup = mostCommon(setups) || 'Unclassified';
         const tr = document.createElement('tr');
-        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'';
+        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; if(mostCommonSetup === 'Unclassified') td_setup.title = 'No setup assigned yet'; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'';
         if(info.net<0) td3.className='p-red';
         tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); rightBody.appendChild(tr);
         // For YTD, no notes preview or click since no specific key
@@ -1044,9 +1083,9 @@
       entries.forEach(([sym,info])=>{
         const symbolTrades = trades.filter(t => t.Symbol === sym);
         const setups = symbolTrades.map(t => loadSetup(getTradeId(t)));
-        const mostCommonSetup = mostCommon(setups) || 'No Setup';
+        const mostCommonSetup = mostCommon(setups) || 'Unclassified';
         const tr = document.createElement('tr');
-        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'p-red'; tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); leftBody.appendChild(tr);
+        const td1 = document.createElement('td'); td1.textContent = sym; const td2 = document.createElement('td'); td2.textContent = info.trades; const td_setup = document.createElement('td'); td_setup.textContent = mostCommonSetup; if(mostCommonSetup === 'Unclassified') td_setup.title = 'No setup assigned yet'; const td3 = document.createElement('td'); td3.textContent = formatPnL(info.net); td3.className = info.net>=0? 'p-green':'p-red'; tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td_setup); tr.appendChild(td3); leftBody.appendChild(tr);
       });
 
       document.getElementById('rightMeta').textContent = `YTD • Trades: ${totalTrades} • PnL: ${formatPnL(totalNet)}`;
@@ -1067,7 +1106,7 @@
     function saveNote(id, text){ localStorage.setItem('tradeNote:'+id, text); }
     function loadDayNote(dateKey){ return localStorage.getItem('dayNote:'+dateKey) || ''; }
     function saveDayNote(dateKey, text){ localStorage.setItem('dayNote:'+dateKey, text); }
-    function loadSetup(tradeId){ return localStorage.getItem('setup:'+tradeId) || 'No Setup'; }
+    function loadSetup(tradeId){ return localStorage.getItem('setup:'+tradeId) || 'Unclassified'; }
     function saveSetup(tradeId, setup){ localStorage.setItem('setup:'+tradeId, setup); }
 
     function showSymbolDetails(symbol, key, scope){
@@ -1091,7 +1130,7 @@
         const td5 = document.createElement('td');
         const select = document.createElement('select');
         select.className = 'btn';
-        ['GyE', 'FRD', 'SIR', 'FailedPmh', 'PMHBO', 'No Setup'].forEach(opt => {
+        ['GyE', 'FRD', 'SIR', 'FailedPmh', 'PMHBO', 'Unclassified'].forEach(opt => {
           const option = document.createElement('option');
           option.value = opt;
           option.textContent = opt;
@@ -1128,15 +1167,17 @@
       for(let i=0;i<first.getDay();i++){ const d = document.createElement('div'); d.className='cal-day'; cal.appendChild(d); }
       for(let day=1; day<=daysInMonth; day++){
         const dKey = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-        const val = (perMonth[monthKey].days[dKey] && perMonth[monthKey].days[dKey].net) || 0;
+        const dayData = perMonth[monthKey].days[dKey];
+        const hasTrades = dayData && dayData.trades && dayData.trades.length > 0;
+        const val = dayData ? dayData.net : 0;
         const cell = document.createElement('div'); cell.className='cal-day';
         const dayOfWeek = new Date(year, month, day).getDay();
         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-        if(isWeekend && val === 0){
+        if(isWeekend && !hasTrades){
           cell.classList.add('weekend');
           cell.innerHTML = `<div style="font-weight:700">${day}</div>`;
         } else {
-          cell.innerHTML = `<div style="font-weight:700">${day}</div><div>${formatPnL(val)}</div>`;
+          cell.innerHTML = `<div style="font-weight:700">${day}</div><div>${hasTrades ? formatPnL(val) : '—'}</div>`;
         }
         if(val>0) cell.classList.add('positive'); else if(val<0) cell.classList.add('negative');
         cell.addEventListener('click', ()=>{ document.getElementById('dateSelect').value = dKey; document.getElementById('dailyBtn').click(); onDateChange(); });
@@ -1242,8 +1283,8 @@
       clearChart(mainChart);
       const ctx = document.getElementById('mainChart').getContext('2d');
       mainChart = new Chart(ctx, {
-        type:'bar', data:{labels:labels, datasets:[{type:'bar', label:'Daily Net', data:daily, backgroundColor: daily.map(v=> v>=0? '#007f3f':'#b00020')}, {type:'line', label:'Monthly Equity', data:cum, borderColor:'#00c853', borderWidth:2, fill:false, tension:0.2}]},
-        options:{scales:{x:{grid:{color:'rgba(255,255,255,0.03)'}}, y:{grid:{color:'rgba(255,255,255,0.03)'}}}, plugins:{legend:{display:true}} }
+        type:'bar', data:{labels:labels, datasets:[{type:'bar', label:'Daily Net', data:daily, backgroundColor: daily.map(v=> v>=0? '#007f3f':'#b00020')}, {type:'line', label:'Monthly Equity', data:cum, borderColor:'#00c853', borderWidth:2, fill:false, tension:0.2}, {type:'line', data:daily.map(() => 0), borderColor:'rgba(255,255,255,0.1)', borderWidth:1, pointRadius:0, fill:false, showLine:true}]},
+        options:{scales:{x:{grid:{color:'rgba(255,255,255,0.03)'}}, y:{grid:{color:'rgba(255,255,255,0.03)'}}}, plugins:{legend:{display:false}} }
       });
 
       document.getElementById('monthMeta').textContent = `Trades: ${month.trades} • PnL: ${formatPnL(month.totalNet)}`;
@@ -1276,6 +1317,48 @@
       document.getElementById('statAvgWin').textContent = stats.avgWin.toFixed(2);
       document.getElementById('statAvgLoss').textContent = stats.avgLoss.toFixed(2);
       document.getElementById('statWinRate').textContent = stats.winRate.toFixed(1) + '%';
+      const rr = stats.avgLoss !== 0 ? (stats.avgWin / Math.abs(stats.avgLoss)).toFixed(2) : '—';
+      document.getElementById('statRR').textContent = rr;
+      // Derived metrics
+      console.log('DEBUG: Daily entries count:', Object.keys(perDay).length);
+      console.log('DEBUG: Equity curve length:', dataVals.length);
+      let bestNet = -Infinity;
+      let bestDate = null;
+      let worstNet = Infinity;
+      let worstDate = null;
+      for (const [date, data] of Object.entries(perDay)) {
+        if (data.totalNet > bestNet) {
+          bestNet = data.totalNet;
+          bestDate = date;
+        }
+        if (data.totalNet < worstNet) {
+          worstNet = data.totalNet;
+          worstDate = date;
+        }
+      }
+      let peak = -Infinity; let maxDD = 0;
+      let trough = Infinity;
+      dataVals.forEach(c => {
+        if (c > peak) peak = c;
+        const dd = c - peak;
+        if (dd < maxDD) maxDD = dd;
+        if (c < trough) trough = c;
+      });
+      console.log('DEBUG: Peak equity:', peak);
+      console.log('DEBUG: Trough equity:', trough);
+      console.log('DEBUG: Computed max drawdown:', maxDD);
+      const expVal = (stats.winRate/100 * stats.avgWin) - ((1 - stats.winRate/100) * Math.abs(stats.avgLoss));
+      const expectancy = isNaN(expVal) || !isFinite(expVal) ? '—' : expVal.toFixed(2);
+      console.log('DEBUG: Best day net:', bestNet, 'date:', bestDate);
+      console.log('DEBUG: Worst day net:', worstNet, 'date:', worstDate);
+      console.log('DEBUG: Max DD:', maxDD);
+      console.log('DEBUG: Expectancy inputs - winRate:', stats.winRate, 'avgWin:', stats.avgWin, 'avgLoss:', stats.avgLoss, 'expVal:', expVal);
+      const bestDayStr = bestDate ? `${formatPnL(bestNet)} (${bestDate})` : '—';
+      const worstDayStr = worstDate ? `${formatPnL(worstNet)} (${worstDate})` : '—';
+      document.getElementById('statBestDay').textContent = bestDayStr;
+      document.getElementById('statWorstDay').textContent = worstDayStr;
+      document.getElementById('statMaxDD').textContent = formatPnL(maxDD);
+      document.getElementById('statExpectancy').textContent = expectancy;
       // Update symbol tables for YTD
       updateSymbolTablesYTD();
     }
