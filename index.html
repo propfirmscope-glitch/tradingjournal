@@ -67,6 +67,7 @@
       <div class="brand">Trading Journal — Local</div>
       <div class="controls">
         <label class="btn" id="uploadLabel">Upload File<input id="fileInput" type="file" accept=".xlsx,.xls,.csv"/></label>
+        <button id="addTradeBtn" class="btn">+ Add Trade</button>
         <select id="dateSelect" class="btn"></select>
         <div class="view-toggle">
           <button id="dailyBtn" class="btn primary">Daily</button>
@@ -202,6 +203,62 @@
         </div>
 
       </div>
+    </div>
+  </div>
+
+  <!-- Manual Trade Entry Modal -->
+  <div id="addTradeModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
+    <div style="background:var(--card); padding:20px; border-radius:12px; border:1px solid rgba(255,255,255,0.03); max-width:400px; width:90%;">
+      <div style="font-weight:700; margin-bottom:16px;">Add Manual Trade</div>
+      <form id="addTradeForm">
+        <div style="margin-bottom:12px;">
+          <label style="display:block; margin-bottom:4px; color:var(--muted); font-size:12px;">Closed Date *</label>
+          <input type="text" id="manualClosedDate" placeholder="YYYY-MM-DD or MM/DD/YYYY" style="width:100%; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); color:#e6eef6; padding:8px; border-radius:8px;" required>
+          <div id="closedDateError" style="color:var(--danger); font-size:12px; display:none;">Invalid date format</div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block; margin-bottom:4px; color:var(--muted); font-size:12px;">Symbol *</label>
+          <input type="text" id="manualSymbol" placeholder="e.g. AAPL" style="width:100%; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); color:#e6eef6; padding:8px; border-radius:8px;" required>
+          <div id="symbolError" style="color:var(--danger); font-size:12px; display:none;">Symbol is required</div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block; margin-bottom:4px; color:var(--muted); font-size:12px;">Net PnL *</label>
+          <input type="number" id="manualNetPnL" step="0.01" placeholder="e.g. 150.50" style="width:100%; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); color:#e6eef6; padding:8px; border-radius:8px;" required>
+          <div id="netPnLError" style="color:var(--danger); font-size:12px; display:none;">Net PnL is required</div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block; margin-bottom:4px; color:var(--muted); font-size:12px;">Qty</label>
+          <input type="number" id="manualQty" placeholder="e.g. 100" style="width:100%; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); color:#e6eef6; padding:8px; border-radius:8px;">
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block; margin-bottom:4px; color:var(--muted); font-size:12px;">Entry Price</label>
+          <input type="number" id="manualEntryPrice" step="0.01" placeholder="e.g. 150.00" style="width:100%; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); color:#e6eef6; padding:8px; border-radius:8px;">
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block; margin-bottom:4px; color:var(--muted); font-size:12px;">Exit Price</label>
+          <input type="number" id="manualExitPrice" step="0.01" placeholder="e.g. 155.00" style="width:100%; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); color:#e6eef6; padding:8px; border-radius:8px;">
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block; margin-bottom:4px; color:var(--muted); font-size:12px;">Setup</label>
+          <select id="manualSetup" style="width:100%; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); color:#e6eef6; padding:8px; border-radius:8px;">
+            <option value="Unclassified">Unclassified</option>
+            <option value="GyE">GyE</option>
+            <option value="FRD">FRD</option>
+            <option value="SIR">SIR</option>
+            <option value="FailedPmh">FailedPmh</option>
+            <option value="PMHBO">PMHBO</option>
+          </select>
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="display:block; margin-bottom:4px; color:var(--muted); font-size:12px;">Notes</label>
+          <textarea id="manualNotes" rows="3" placeholder="Optional notes..." style="width:100%; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); color:#e6eef6; padding:8px; border-radius:8px; resize:vertical;"></textarea>
+        </div>
+        <div id="duplicateWarning" style="color:var(--accent); font-size:12px; margin-bottom:12px; display:none;">This trade already exists and will not be added.</div>
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button type="button" id="cancelAddTrade" class="btn">Cancel</button>
+          <button type="submit" class="btn primary">Add Trade</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -1518,6 +1575,127 @@
       saveDayNote(dateKey, text);
       document.getElementById('saveDayNotesBtn').textContent = 'Saved';
       setTimeout(() => document.getElementById('saveDayNotesBtn').textContent = 'Save Day Notes', 800);
+    });
+
+    // Manual trade entry
+    document.getElementById('addTradeBtn').addEventListener('click', () => {
+      const modal = document.getElementById('addTradeModal');
+      modal.style.display = 'flex';
+      modal.style.alignItems = 'center';
+      modal.style.justifyContent = 'center';
+      // Reset form
+      document.getElementById('addTradeForm').reset();
+      document.getElementById('closedDateError').style.display = 'none';
+      document.getElementById('symbolError').style.display = 'none';
+      document.getElementById('netPnLError').style.display = 'none';
+      document.getElementById('duplicateWarning').style.display = 'none';
+    });
+
+    document.getElementById('addTradeModal').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('addTradeModal')) {
+        document.getElementById('addTradeModal').style.display = 'none';
+      }
+    });
+
+    document.getElementById('addTradeForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      // Get values
+      const closedDateStr = document.getElementById('manualClosedDate').value.trim();
+      const symbol = document.getElementById('manualSymbol').value.trim();
+      const netPnL = parseFloat(document.getElementById('manualNetPnL').value);
+      const qty = document.getElementById('manualQty').value ? parseFloat(document.getElementById('manualQty').value) : null;
+      const entryPrice = document.getElementById('manualEntryPrice').value ? parseFloat(document.getElementById('manualEntryPrice').value) : null;
+      const exitPrice = document.getElementById('manualExitPrice').value ? parseFloat(document.getElementById('manualExitPrice').value) : null;
+      const setup = document.getElementById('manualSetup').value;
+      const notes = document.getElementById('manualNotes').value.trim();
+      
+      // Validation
+      let valid = true;
+      if (!closedDateStr) {
+        document.getElementById('closedDateError').textContent = 'Closed date is required';
+        document.getElementById('closedDateError').style.display = 'block';
+        valid = false;
+      } else {
+        const parsedDate = parseFlexibleDate(closedDateStr);
+        if (!parsedDate || isNaN(parsedDate)) {
+          document.getElementById('closedDateError').textContent = 'Invalid date format';
+          document.getElementById('closedDateError').style.display = 'block';
+          valid = false;
+        } else {
+          document.getElementById('closedDateError').style.display = 'none';
+        }
+      }
+      
+      if (!symbol) {
+        document.getElementById('symbolError').style.display = 'block';
+        valid = false;
+      } else {
+        document.getElementById('symbolError').style.display = 'none';
+      }
+      
+      if (isNaN(netPnL)) {
+        document.getElementById('netPnLError').style.display = 'block';
+        valid = false;
+      } else {
+        document.getElementById('netPnLError').style.display = 'none';
+      }
+      
+      if (!valid) return;
+      
+      // Parse date
+      const closedDate = parseFlexibleDate(closedDateStr);
+      
+      // Create trade object
+      const raw = {
+        Opened: null,
+        Closed: closedDate,
+        Symbol: symbol,
+        Entry: entryPrice,
+        Exit: exitPrice,
+        Qty: qty,
+        NET: netPnL
+      };
+      
+      const trade = {
+        Opened: null,
+        Closed: closedDate,
+        Symbol: symbol,
+        NET: netPnL,
+        raw: raw
+      };
+      
+      // Generate tradeId
+      trade.tradeId = getTradeId(trade);
+      
+      // Check for duplicates
+      const existingIds = new Set(trades.map(t => t.tradeId || getTradeId(t)));
+      if (existingIds.has(trade.tradeId)) {
+        document.getElementById('duplicateWarning').style.display = 'block';
+        return;
+      }
+      
+      // Add trade
+      trades.push(trade);
+      rebuildAggregations();
+      saveTradesToStorage();
+      
+      // Save setup and notes if provided
+      if (setup && setup !== 'Unclassified') {
+        saveSetup(trade.tradeId, setup);
+      }
+      if (notes) {
+        saveNote(trade.tradeId, notes);
+      }
+      
+      // Update UI
+      populateDateSelector();
+      updateMiniChart();
+      updateSetupStats();
+      onDateChange();
+      
+      // Close modal
+      document.getElementById('addTradeModal').style.display = 'none';
     });
 
     // Allow dropping file onto window
