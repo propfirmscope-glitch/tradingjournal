@@ -75,6 +75,7 @@
           <button id="ytdBtn" class="btn">YTD</button>
         </div>
         <button id="setupStatsBtn" class="btn">Setup Stats</button>
+        <button id="analyticsBtn" class="btn">Analytics</button>
         <button id="calendarBtn" class="btn">Calendar</button>
         <button id="resetBtn" class="btn">Reset</button>
       </div>
@@ -102,6 +103,52 @@
           <thead><tr><th>Setup</th><th>Direction</th><th>Trades</th><th>Wins</th><th>Losses</th><th>Winrate %</th><th>Total PnL</th><th>Avg</th><th>Avg Win</th><th>Avg Loss</th></tr></thead>
           <tbody></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Advanced Time & Session Analytics Section (hidden by default) -->
+    <div id="advancedAnalyticsSection" style="display:none; margin-top:14px">
+      <div class="card">
+        <div style="font-weight:700; margin-bottom:12px">Advanced Time & Session Analytics</div>
+        
+        <!-- Hour-of-Day Stats Tab -->
+        <div style="margin-bottom:16px">
+          <div style="font-weight:700; font-size:14px; margin-bottom:8px">Hour-of-Day Statistics</div>
+          <table class="table" id="hourStatsTable" style="font-size:12px">
+            <thead><tr><th>Hour</th><th>Trades</th><th>Win Rate %</th><th>Total PnL</th><th>Avg/Trade</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <!-- Day-of-Week Stats Tab -->
+        <div style="margin-bottom:16px">
+          <div style="font-weight:700; font-size:14px; margin-bottom:8px">Day-of-Week Statistics</div>
+          <table class="table" id="dayOfWeekStatsTable" style="font-size:12px">
+            <thead><tr><th>Day</th><th>Trades</th><th>Win Rate %</th><th>Total PnL</th><th>Avg/Trade</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <!-- Session Split Tab -->
+        <div style="margin-bottom:16px">
+          <div style="font-weight:700; font-size:14px; margin-bottom:8px">Session Split (EST)</div>
+          <table class="table" id="sessionStatsTable" style="font-size:12px">
+            <thead><tr><th>Session</th><th>Time Range</th><th>Trades</th><th>Win Rate %</th><th>Total PnL</th><th>Avg/Trade</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <!-- Heatmaps Container -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px">
+          <div>
+            <div style="font-weight:700; font-size:14px; margin-bottom:8px">PnL Heatmap (Day × Hour)</div>
+            <canvas id="heatmapPnL" style="border:1px solid rgba(255,255,255,0.03); border-radius:8px; max-height:300px"></canvas>
+          </div>
+          <div>
+            <div style="font-weight:700; font-size:14px; margin-bottom:8px">Win Rate Heatmap (Day × Hour)</div>
+            <canvas id="heatmapWinRate" style="border:1px solid rgba(255,255,255,0.03); border-radius:8px; max-height:300px"></canvas>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -262,6 +309,37 @@
     </div>
   </div>
 
+  <!-- Donation/Free Tool Popup Modal -->
+  <div id="donationPopup" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center;">
+    <div style="background:var(--card); padding:24px; border-radius:12px; border:1px solid rgba(255,255,255,0.03); max-width:500px; width:90%;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+        <div style="font-weight:700; font-size:16px;">Support This Tool</div>
+        <button id="closeDonationPopup" style="background:transparent; border:none; color:var(--muted); font-size:20px; cursor:pointer; padding:0; width:24px; height:24px; display:flex; align-items:center; justify-content:center;">×</button>
+      </div>
+      <div style="color:#e6eef6; line-height:1.6; margin-bottom:16px; font-size:14px;">
+        <p>This tool is 100% free and always will be.</p>
+        <p>If you find it useful, donations are appreciated:</p>
+      </div>
+      <div style="background:rgba(255,255,255,0.02); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.03); margin-bottom:16px; font-size:12px;">
+        <div style="margin-bottom:8px;">
+          <div style="color:var(--muted); font-size:11px; margin-bottom:2px;">Bitcoin</div>
+          <div style="word-break:break-all; font-family:monospace; color:#e6eef6; font-size:11px;">bc1qzu37jgqpagehyaz2emq2d9xj4vw4kjkesyqa6g</div>
+        </div>
+        <div style="margin-bottom:8px;">
+          <div style="color:var(--muted); font-size:11px; margin-bottom:2px;">Ethereum</div>
+          <div style="word-break:break-all; font-family:monospace; color:#e6eef6; font-size:11px;">0x496207237C017352F4270a17F938E6e31206ddD5</div>
+        </div>
+        <div>
+          <div style="color:var(--muted); font-size:11px; margin-bottom:2px;">Solana</div>
+          <div style="word-break:break-all; font-family:monospace; color:#e6eef6; font-size:11px;">9gGtt4uEHz8A5K4iMGDt4QHHKsJt9qpJj1Jwa7NGAzKJ</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button id="dismissDonationPopup" class="btn">Dismiss</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Logical fields for multi-broker compatibility
     const LOGICAL_FIELDS = {
@@ -344,6 +422,11 @@
         perMonth[m].totalNet += t.NET;
         perMonth[m].trades += 1;
       });
+      // Update analytics if analytics panel is visible
+      const analyticsSection = document.getElementById('advancedAnalyticsSection');
+      if (analyticsSection && analyticsSection.style.display !== 'none') {
+        updateAnalytics();
+      }
     }
     function loadTradesFromStorage(){
       try {
@@ -1563,10 +1646,383 @@
     // utility: safe number
     function toNum(v){ return Number(String(v).replace(/[^0-9\-\.]/g,''))||0; }
 
+    // ============ SESSION DEFINITIONS (EST) ============
+    // Sessions are defined by EST times (using local time from Closed timestamp)
+    const SESSION_DEFINITIONS = {
+      'Premarket': { startHour: 4, endHour: 9 },    // 4:00 AM - 8:59 AM EST
+      'Open': { startHour: 9, endHour: 12 },        // 9:30 AM - 11:59 AM EST (main opening period)
+      'Mid-day': { startHour: 12, endHour: 15 },    // 12:00 PM - 2:59 PM EST
+      'Power Hour': { startHour: 15, endHour: 16 }, // 3:00 PM - 3:59 PM EST (last hour)
+      'After-hours': { startHour: 16, endHour: 24 } // 4:00 PM - 11:59 PM EST
+    };
+
+    function getSessionForHour(hour) {
+      for (const [sessionName, range] of Object.entries(SESSION_DEFINITIONS)) {
+        if (hour >= range.startHour && hour < range.endHour) {
+          return sessionName;
+        }
+      }
+      return 'Unknown';
+    }
+
+    // ============ ADVANCED ANALYTICS FUNCTIONS ============
+    function computeHourStats() {
+      const hourData = {};
+      for (let h = 0; h < 24; h++) hourData[h] = { trades: [], totalNet: 0 };
+
+      trades.forEach(t => {
+        if (!(t.Closed instanceof Date) || isNaN(t.Closed)) return;
+        const hour = t.Closed.getHours();
+        if (hourData[hour]) {
+          hourData[hour].trades.push(t);
+          hourData[hour].totalNet += t.NET;
+        }
+      });
+
+      const result = [];
+      for (let h = 0; h < 24; h++) {
+        const data = hourData[h];
+        const tradeCount = data.trades.length;
+        if (tradeCount === 0) continue;
+
+        let wins = 0, losses = 0;
+        data.trades.forEach(t => {
+          if (t.NET > 0) wins++;
+          else if (t.NET < 0) losses++;
+        });
+
+        const winRate = (wins / tradeCount) * 100;
+        const avgTrade = data.totalNet / tradeCount;
+
+        result.push({
+          hour: h,
+          hourLabel: String(h).padStart(2, '0') + ':00',
+          trades: tradeCount,
+          winRate: winRate,
+          totalNet: data.totalNet,
+          avgTrade: avgTrade
+        });
+      }
+      return result;
+    }
+
+    function computeDayOfWeekStats() {
+      const dayData = {};
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+      for (let d = 0; d < 7; d++) dayData[d] = { trades: [], totalNet: 0 };
+
+      trades.forEach(t => {
+        if (!(t.Closed instanceof Date) || isNaN(t.Closed)) return;
+        const dayOfWeek = t.Closed.getDay();
+        if (dayData[dayOfWeek]) {
+          dayData[dayOfWeek].trades.push(t);
+          dayData[dayOfWeek].totalNet += t.NET;
+        }
+      });
+
+      const result = [];
+      for (let d = 0; d < 7; d++) {
+        const data = dayData[d];
+        const tradeCount = data.trades.length;
+        if (tradeCount === 0) continue;
+
+        let wins = 0, losses = 0;
+        data.trades.forEach(t => {
+          if (t.NET > 0) wins++;
+          else if (t.NET < 0) losses++;
+        });
+
+        const winRate = (wins / tradeCount) * 100;
+        const avgTrade = data.totalNet / tradeCount;
+
+        result.push({
+          day: d,
+          dayName: dayNames[d],
+          trades: tradeCount,
+          winRate: winRate,
+          totalNet: data.totalNet,
+          avgTrade: avgTrade
+        });
+      }
+      return result;
+    }
+
+    function computeSessionStats() {
+      const sessionData = {};
+      for (const session of Object.keys(SESSION_DEFINITIONS)) {
+        sessionData[session] = { trades: [], totalNet: 0 };
+      }
+
+      trades.forEach(t => {
+        if (!(t.Closed instanceof Date) || isNaN(t.Closed)) return;
+        const hour = t.Closed.getHours();
+        const session = getSessionForHour(hour);
+        if (sessionData[session]) {
+          sessionData[session].trades.push(t);
+          sessionData[session].totalNet += t.NET;
+        }
+      });
+
+      const result = [];
+      for (const [session, range] of Object.entries(SESSION_DEFINITIONS)) {
+        const data = sessionData[session];
+        const tradeCount = data.trades.length;
+        if (tradeCount === 0) continue;
+
+        let wins = 0, losses = 0;
+        data.trades.forEach(t => {
+          if (t.NET > 0) wins++;
+          else if (t.NET < 0) losses++;
+        });
+
+        const winRate = (wins / tradeCount) * 100;
+        const avgTrade = data.totalNet / tradeCount;
+        const timeRange = `${String(range.startHour).padStart(2, '0')}:00 - ${String(range.endHour).padStart(2, '0')}:00`;
+
+        result.push({
+          session: session,
+          timeRange: timeRange,
+          trades: tradeCount,
+          winRate: winRate,
+          totalNet: data.totalNet,
+          avgTrade: avgTrade
+        });
+      }
+      return result;
+    }
+
+    function computeHeatmapData() {
+      // Build heatmap: rows = days of week (0-6), cols = hours (0-23)
+      // Returns: { pnl: 7x24 matrix, winRate: 7x24 matrix }
+      const pnlMatrix = Array(7).fill(null).map(() => Array(24).fill(0));
+      const countMatrix = Array(7).fill(null).map(() => Array(24).fill(0));
+      const winsMatrix = Array(7).fill(null).map(() => Array(24).fill(0));
+
+      trades.forEach(t => {
+        if (!(t.Closed instanceof Date) || isNaN(t.Closed)) return;
+        const dayOfWeek = t.Closed.getDay();
+        const hour = t.Closed.getHours();
+
+        pnlMatrix[dayOfWeek][hour] += t.NET;
+        countMatrix[dayOfWeek][hour] += 1;
+        if (t.NET > 0) winsMatrix[dayOfWeek][hour] += 1;
+      });
+
+      // Compute win rates (null = no trades, not 0% win rate)
+      const winRateMatrix = Array(7).fill(null).map(() => Array(24).fill(null));
+      for (let d = 0; d < 7; d++) {
+        for (let h = 0; h < 24; h++) {
+          if (countMatrix[d][h] > 0) {
+            winRateMatrix[d][h] = (winsMatrix[d][h] / countMatrix[d][h]) * 100;
+          }
+          // Leave as null if countMatrix[d][h] === 0 (no trades occurred)
+        }
+      }
+
+      return { pnl: pnlMatrix, winRate: winRateMatrix, count: countMatrix };
+    }
+
+    function renderHeatmap(canvasId, data, label) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const cellSize = 20;
+      const width = cellSize * 24 + 60;
+      const height = cellSize * 7 + 40;
+
+      canvas.width = width;
+      canvas.height = height;
+
+      // Draw cells
+      for (let d = 0; d < 7; d++) {
+        for (let h = 0; h < 24; h++) {
+          const val = data[d][h];
+          let color;
+
+          if (label === 'PnL') {
+            // Green for positive, red for negative
+            if (val > 0) {
+              const intensity = Math.min(val / 500, 1); // scale by 500 per unit
+              color = `rgba(0, 200, 83, ${0.2 + intensity * 0.8})`;
+            } else if (val < 0) {
+              const intensity = Math.min(Math.abs(val) / 500, 1);
+              color = `rgba(255, 82, 82, ${0.2 + intensity * 0.8})`;
+            } else {
+              color = 'rgba(255, 255, 255, 0.05)';
+            }
+          } else {
+            // Win rate: gradient from red (0%) to green (100%)
+            // Only apply color if trades > 0; use neutral for no-trade cells
+            if (val === null || val === undefined) {
+              // No trades in this cell: neutral/empty state
+              color = 'rgba(255, 255, 255, 0.05)';
+            } else {
+              // Trades occurred: color gradient based on win rate
+              const hue = (val / 100) * 120; // 0-120 degrees in HSL
+              color = `hsla(${hue}, 70%, 50%, 0.5)`;
+            }
+          }
+
+          ctx.fillStyle = color;
+          ctx.fillRect(60 + h * cellSize, 20 + d * cellSize, cellSize, cellSize);
+
+          // Draw border
+          ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(60 + h * cellSize, 20 + d * cellSize, cellSize, cellSize);
+
+          // Draw text if cell has data
+          if (label === 'PnL' && data[d][h] !== 0) {
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.font = '9px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(data[d][h].toFixed(0), 60 + h * cellSize + cellSize / 2, 20 + d * cellSize + cellSize / 2);
+          }
+        }
+      }
+
+      // Draw row labels (days)
+      ctx.fillStyle = '#d0d8e0';
+      ctx.font = 'bold 11px Arial';
+      ctx.textAlign = 'right';
+      for (let d = 0; d < 7; d++) {
+        ctx.fillText(dayNames[d], 55, 20 + d * cellSize + cellSize / 2);
+      }
+
+      // Draw column labels (hours)
+      ctx.fillStyle = '#d0d8e0';
+      ctx.font = 'bold 11px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      for (let h = 0; h < 24; h++) {
+        if (h % 3 === 0) {
+          ctx.fillText(String(h).padStart(2, '0'), 60 + h * cellSize + cellSize / 2, 15);
+        }
+      }
+    }
+
+    function updateAnalytics() {
+      // Compute all analytics
+      const hourStats = computeHourStats();
+      const dayOfWeekStats = computeDayOfWeekStats();
+      const sessionStats = computeSessionStats();
+      const heatmapData = computeHeatmapData();
+
+      // Render Hour Stats
+      const hourTbody = document.getElementById('hourStatsTable').querySelector('tbody');
+      hourTbody.innerHTML = '';
+      hourStats.forEach(stat => {
+        const tr = document.createElement('tr');
+        const cells = [
+          stat.hourLabel,
+          String(stat.trades),
+          stat.winRate.toFixed(1) + '%',
+          formatPnL(stat.totalNet),
+          stat.avgTrade.toFixed(2)
+        ];
+        cells.forEach((text, idx) => {
+          const td = document.createElement('td');
+          td.textContent = text;
+          if (idx === 3) td.className = stat.totalNet >= 0 ? 'p-green' : 'p-red';
+          if (idx === 4) td.className = stat.avgTrade >= 0 ? 'p-green' : 'p-red';
+          tr.appendChild(td);
+        });
+        hourTbody.appendChild(tr);
+      });
+
+      // Render Day-of-Week Stats
+      const dayOfWeekTbody = document.getElementById('dayOfWeekStatsTable').querySelector('tbody');
+      dayOfWeekTbody.innerHTML = '';
+      dayOfWeekStats.forEach(stat => {
+        const tr = document.createElement('tr');
+        const cells = [
+          stat.dayName,
+          String(stat.trades),
+          stat.winRate.toFixed(1) + '%',
+          formatPnL(stat.totalNet),
+          stat.avgTrade.toFixed(2)
+        ];
+        cells.forEach((text, idx) => {
+          const td = document.createElement('td');
+          td.textContent = text;
+          if (idx === 3) td.className = stat.totalNet >= 0 ? 'p-green' : 'p-red';
+          if (idx === 4) td.className = stat.avgTrade >= 0 ? 'p-green' : 'p-red';
+          tr.appendChild(td);
+        });
+        dayOfWeekTbody.appendChild(tr);
+      });
+
+      // Render Session Stats
+      const sessionTbody = document.getElementById('sessionStatsTable').querySelector('tbody');
+      sessionTbody.innerHTML = '';
+      sessionStats.forEach(stat => {
+        const tr = document.createElement('tr');
+        const cells = [
+          stat.session,
+          stat.timeRange,
+          String(stat.trades),
+          stat.winRate.toFixed(1) + '%',
+          formatPnL(stat.totalNet),
+          stat.avgTrade.toFixed(2)
+        ];
+        cells.forEach((text, idx) => {
+          const td = document.createElement('td');
+          td.textContent = text;
+          if (idx === 4) td.className = stat.totalNet >= 0 ? 'p-green' : 'p-red';
+          if (idx === 5) td.className = stat.avgTrade >= 0 ? 'p-green' : 'p-red';
+          tr.appendChild(td);
+        });
+        sessionTbody.appendChild(tr);
+      });
+
+      // Render heatmaps
+      renderHeatmap('heatmapPnL', heatmapData.pnl, 'PnL');
+      renderHeatmap('heatmapWinRate', heatmapData.winRate, 'WinRate');
+    }
+
+    // ============ DONATION POPUP FUNCTIONS ============
+    function showDonationPopup() {
+      const popup = document.getElementById('donationPopup');
+      popup.style.display = 'flex';
+    }
+
+    function hideDonationPopup() {
+      const popup = document.getElementById('donationPopup');
+      popup.style.display = 'none';
+      localStorage.setItem('donationPopupDismissed', 'true');
+    }
+
+    // Event listeners for donation popup
+    document.getElementById('closeDonationPopup').addEventListener('click', hideDonationPopup);
+    document.getElementById('dismissDonationPopup').addEventListener('click', hideDonationPopup);
+    document.getElementById('donationPopup').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('donationPopup')) hideDonationPopup();
+    });
+
+    // Analytics button toggle
+    document.getElementById('analyticsBtn').addEventListener('click', () => {
+      const section = document.getElementById('advancedAnalyticsSection');
+      if (section.style.display === 'none' || section.style.display === '') {
+        section.style.display = 'block';
+        updateAnalytics();
+      } else {
+        section.style.display = 'none';
+      }
+    });
+
     // initial empty state
     loadTradesFromStorage();
     if(trades.length === 0) {
       renderEmpty();
+    }
+
+    // Show donation popup on first load if not dismissed
+    if (!localStorage.getItem('donationPopupDismissed')) {
+      setTimeout(() => showDonationPopup(), 500);
     }
 
     document.getElementById('saveDayNotesBtn').addEventListener('click', ()=>{
